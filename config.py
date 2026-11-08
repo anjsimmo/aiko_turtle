@@ -40,6 +40,10 @@ WEB_USERNAME = env("TURTLE_USERNAME", os.environ.get("USER", "anonymous"))
 # Empty = open.  Set it and every POST/DELETE on the REST API needs
 # "Authorization: Bearer <token>" (the page asks for it once)
 API_TOKEN = env("TURTLE_API_TOKEN", "")
+# Show the token on the page and in /guide, pre-filled, so developers just
+# use it (a community sandbox: the token keeps bots out, not people).
+# Set to "false" to make visitors ask for it instead
+API_TOKEN_PUBLIC = env("TURTLE_API_TOKEN_PUBLIC", "true").lower() in ("1", "true", "yes")
 
 # LLM ChatAgent
 OPENAI_API_KEY = env("OPENAI_API_KEY", "")

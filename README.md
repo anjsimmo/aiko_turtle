@@ -88,6 +88,7 @@ you are most likely to touch:
 | `TURTLE_CHANNEL` | `robots` | chat channel |
 | `TURTLE_WEB_PORT` | `8123` | the web server binds `127.0.0.1` |
 | `TURTLE_API_TOKEN` | *(empty)* | set it and every POST/DELETE on the REST API needs `Authorization: Bearer <token>`; reads and pages stay open |
+| `TURTLE_API_TOKEN_PUBLIC` | `true` | show the token on the page and in `/guide`, pre-filled: a formality that keeps stray bots out, not developers. `false` to hide it |
 | `OPENAI_API_KEY` | | the agent falls back to the `claude` CLI without it |
 | `TURTLE_LLM_RATE_PER_MINUTE` | `10` | agent requests per minute (also `_USER_` per user, and `_QUEUE_LIMIT`) |
 

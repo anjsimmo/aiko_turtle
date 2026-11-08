@@ -151,6 +151,10 @@ def test_bearer_token():
     assert client.post("/api/robots", json={"name": "t1"}, headers=ok).status_code == 201
     assert client.delete("/api/robots/t1").status_code == 401
     assert client.delete("/api/robots/t1", headers=ok).status_code == 200
+    assert client.get("/api/status").json()["token"] == "TURTLES_ALL_THE_WAY_DOWN"
+    private = TestClient(create_app(FakeBackend(), api_token="secret",
+                                    api_token_public=False))
+    assert "token" not in private.get("/api/status").json()
 
 
 def test_event_replay_for_a_new_page(client):

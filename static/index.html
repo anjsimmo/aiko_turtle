@@ -71,6 +71,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:2px so
 #tokenrow { display:none; gap:8px; align-items:center; margin-top:8px; font-size:0.74rem; color:var(--muted); }
 #tokenrow.show { display:flex; }
 #token { flex:1; min-width:0; font-size:0.78rem; }
+#tokennote { white-space:nowrap; }
 a { color:var(--accent); }
 </style></head><body class="view-__VIEW__">
 <header>
@@ -108,7 +109,7 @@ a { color:var(--accent); }
     <button type="submit">send</button>
   </form>
   <div id="hint"></div>
-  <div id="tokenrow"><label for="token">API token</label><input id="token" type="password" placeholder="this instance needs a bearer token to create or drive robots"></div>
+  <div id="tokenrow"><label for="token">API token</label><input id="token" type="text" placeholder="this instance needs a bearer token to create, drive and chat" spellcheck="false"><span id="tokennote"></span></div>
 </section>
 </main>
 <script>
@@ -132,7 +133,14 @@ function me() { return humanName(who.value); }
 var token = document.getElementById("token");
 token.value = load("turtle.token", "");
 token.addEventListener("change", function () { store("turtle.token", token.value.trim()); });
-if (AUTH) document.getElementById("tokenrow").className = "show";
+if (AUTH) {
+  document.getElementById("tokenrow").className = "show";
+  fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
+    if (!s.token) return;
+    if (!token.value) { token.value = s.token; store("turtle.token", s.token); }
+    document.getElementById("tokennote").textContent = "(default: " + s.token + ", sent with every create, drive and chat; the same works for curl and scripts)";
+  });
+}
 function api(path, method, body) {
   var headers = { "Content-Type": "application/json" };
   if (AUTH && token.value.trim()) headers["Authorization"] = "Bearer " + token.value.trim();

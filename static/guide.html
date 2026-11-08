@@ -104,7 +104,10 @@ curl -X POST __BASE__/api/chat -H 'Content-Type: application/json' \
      -d '{"message": "@@my_turtle look", "username": "@me", "channel": "__CHANNEL__"}'
 curl -X DELETE __BASE__/api/robots/my_turtle</pre>
 <p>Every drive call returns the new pose. <code>examples/rest_drive.py</code> is the same in 30 lines of standard-library Python.</p>
-<p id="authnote"><strong>Token.</strong> This instance <span id="authstate">does not need a token</span>. When one is set, reads stay open and every POST and DELETE needs <code>Authorization: Bearer &lt;token&gt;</code> (the page asks for it once; <code>/docs</code> has an Authorize button). Ask in the chat or at the meetup for it.</p>
+<p id="authnote"><strong>Token.</strong> This instance <span id="authstate">does not need a token</span>. When one is set, reads stay open and every POST and DELETE needs <code>Authorization: Bearer &lt;token&gt;</code>: the page fills it in for you, <code>/docs</code> has an Authorize button, and for curl and scripts it is one header:</p>
+<pre id="tokenexample" style="display:none">curl -X POST __BASE__/api/robots/my_turtle/move -H 'Authorization: Bearer __TOKEN__' \
+     -H 'Content-Type: application/json' -d '{"distance": 100, "username": "@me"}'
+export TURTLE_API_TOKEN=__TOKEN__        # examples/rest_drive.py and mcp_server.py read this</pre>
 
 <h2 id="agents">4. Agents and LLMs</h2>
 <p>An agent with Python should use Aiko (section 2): discovery by tags, direct calls, its own Services. <code>examples/agent_bot.py</code> is the template, and <code>agent.py</code> (the <code>__AGENT__</code> you see in the chat) is the same shape with an LLM in the middle and a rate limit. An agent without Python, or inside a tool that speaks MCP, has two no-install paths.</p>
@@ -133,7 +136,14 @@ claude mcp add turtle -e TURTLE_URL=__BASE__ -- python3 /path/to/aiko_turtle/mcp
 var base = location.origin;
 document.querySelectorAll("pre").forEach(function (pre) { pre.textContent = pre.textContent.split("__BASE__").join(base); });
 fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
-  if (s.auth) document.getElementById("authstate").innerHTML = "<strong>needs a token for writes</strong>";
+  if (!s.auth) return;
+  var state = document.getElementById("authstate"), ex = document.getElementById("tokenexample");
+  if (s.token) {
+    state.innerHTML = "<strong>needs a token for writes, and here it is: <code>" + s.token + "</code></strong>";
+    ex.textContent = ex.textContent.split("__TOKEN__").join(s.token); ex.style.display = "block";
+  } else {
+    state.innerHTML = "<strong>needs a token for writes</strong> (ask in the chat or at the meetup)";
+  }
 });
 fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list) {
   var tb = document.querySelector("#kinds tbody");

@@ -188,10 +188,12 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
-               agent=config.AGENT_BOTNAME, api_token=config.API_TOKEN):
+               agent=config.AGENT_BOTNAME, api_token=config.API_TOKEN,
+               api_token_public=config.API_TOKEN_PUBLIC):
     """api_token: when non-empty, every request that changes something
     (POST, DELETE) must carry "Authorization: Bearer <api_token>".
-    Reads and the pages stay open"""
+    Reads and the pages stay open.  api_token_public: the token is shown
+    on the page and in /api/status, pre-filled, so it is a formality"""
 
     app = FastAPI(
         title="aiko_turtle",
@@ -201,8 +203,9 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
             "with any name; a longer, unusual name is less likely to clash "
             "with someone else's.  Live poses and chat: GET /events (SSE).  "
             "The human guide, with Aiko and REST examples: /guide."
-            + ("  **This instance needs a bearer token for POST and DELETE** "
-               "(the Authorize button)." if api_token else "")),
+            + ("  **POST and DELETE need a bearer token** (the Authorize "
+               "button)" + (f": `{api_token}`." if api_token_public else
+               "; ask for it in the chat.") if api_token else "")),
         version="1.1")
     app.state.backend = backend
 
@@ -284,9 +287,12 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
 
     @app.get("/api/status", tags=["world"])
     def status():
-        return dict(call(backend.status), auth=bool(api_token),
-                    channel=channel, agent=agent,
-                    streams=len(backend.hub.clients))
+        status = dict(call(backend.status), auth=bool(api_token),
+                      channel=channel, agent=agent,
+                      streams=len(backend.hub.clients))
+        if api_token and api_token_public:
+            status["token"] = api_token
+        return status
 
     @app.get("/api/kinds", tags=["robots"])
     def list_kinds():

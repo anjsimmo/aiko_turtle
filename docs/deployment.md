@@ -84,8 +84,10 @@ OPENAI_API_KEY=sk-...             # optional; without it the agent needs the cla
 
 With `TURTLE_API_TOKEN` set, reads and the pages stay open but every
 request that changes something (create, drive, delete, chat) needs
-`Authorization: Bearer <token>`; the page asks for it once and keeps it
-in the browser. Leave it unset for an open sandbox.
+`Authorization: Bearer <token>`. By default the token is shown on the
+page and in `/guide` and pre-filled, so for developers it is one header
+to copy; set `TURTLE_API_TOKEN_PUBLIC=false` to hide it and hand it out
+by other means. Leave the token unset for a fully open sandbox.
 
 Everything else keeps its default. `TURTLE_WEB_HOST` stays
 `127.0.0.1`: the web server is only ever reached through nginx. The
