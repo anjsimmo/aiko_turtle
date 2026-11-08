@@ -192,7 +192,6 @@ claude mcp add turtle -e TURTLE_URL=https://turtle.aiko.hashtag.ai -- python3 $P
 | `so101` | LeRobot SO-101 arm: grasps, does not drive | Grasp Perceive Telemetry |
 | `drone` | a generic quadcopter: `move` is a 3D vector, forward, left, up | Move Perceive Telemetry |
 | `pi` | a Raspberry Pi with display, speaker and mic: senses, does not move | Perceive Telemetry |
-| `arrow` | a plain marker | Move Perceive Telemetry |
 
 A kind decides the sprite on the map, the chat commands a robot accepts
 (`@@pi move 10` gets "a pi cannot move", `@@turtle move 0 50` gets "a

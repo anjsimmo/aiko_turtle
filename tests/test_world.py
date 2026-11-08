@@ -25,7 +25,7 @@ def test_create_move_turn_reset():
 def test_state_survives_a_restart():
     world = World("sqlite://")
     database = world.database
-    world.create("t1", kind="arrow", owner="anj")
+    world.create("t1", kind="xgo", owner="anj")
     world.move("t1", 50)
     reloaded = World.__new__(World)         # same database, fresh memory
     reloaded.database, reloaded.listener = database, None

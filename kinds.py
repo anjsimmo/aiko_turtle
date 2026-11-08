@@ -49,11 +49,6 @@ KINDS = {
         "description": "a Pi with a small display, speaker and microphone: senses, does not move",
         "interfaces": ["Perceive", "Telemetry"], "axes": 0,
     },
-    "arrow": {
-        "label": "Arrow",
-        "description": "a plain marker, for when the robot is the point and not the picture",
-        "interfaces": ["Move", "Perceive", "Telemetry"], "axes": 1,
-    },
 }
 
 DEFAULT_KIND = "turtle"

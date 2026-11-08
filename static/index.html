@@ -575,7 +575,7 @@ function renderChips() {
   var axes = kind ? kind.axes : 1;
   [["move 100", "move", 1], ["turn 90", "turn", 1], ["move 0 50", "move", 2], ["move 0 0 30", "move", 3], ["move 0 0 -30", "move", 3], ["grasp", "grasp", 1], ["release", "release", 1], ["look", "look", 1], ["reset", "reset", 1], ["telemetry", "telemetry", 1]].forEach(function (cmd) {
     var b = document.createElement("button"); b.type = "button"; b.textContent = cmd[0];
-    b.disabled = !!(allowed && allowed.indexOf(cmd[1]) < 0) || (kind && cmd[2] > axes);
+    b.disabled = !!(allowed && allowed.indexOf(cmd[1]) < 0) || !!(kind && cmd[1] === "move" && cmd[2] > axes);
     if (cmd[2] > 1) b.title = cmd[2] === 2 ? "sideways: omni wheels and walkers" : "up or down: drones";
     if (!b.title) b.title = b.disabled ? "a " + sel.type + " cannot " + cmd[0] : "send @@" + (selected || "robot") + " " + cmd[0];
     b.addEventListener("click", function () {
