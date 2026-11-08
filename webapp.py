@@ -43,11 +43,10 @@ class Backend:
     def status(self): ...                       # {"world": bool, "chat": str|None}
     def list_robots(self): ...                  # [robot, ...]
     def create_robot(self, name, kind, owner, x=0.0, y=0.0, heading=0.0): ...
-    def place(self, name, x, y, heading, username): ...   # heading None = keep
     def destroy_robot(self, name): ...
     def move(self, name, distance, username): ...
     def turn(self, name, angle, username): ...
-    def reset(self, name, username): ...
+    def reset(self, name, username, x=0.0, y=0.0, heading=0.0): ...
     def pose(self, name): ...
     def history(self, name, limit): ...         # [event, ...]
     def send_chat(self, username, message, channel=None): ...
@@ -168,13 +167,6 @@ class RobotCreate(BaseModel):
     heading: float = 0.0
 
 
-class PlaceRequest(BaseModel):
-    x: float
-    y: float
-    heading: Optional[float] = Field(default=None, description="omit to keep")
-    username: str = Username
-
-
 class MoveRequest(BaseModel):
     distance: Union[float, List[float]] = Field(
         description="a number: units forward (negative = backwards); or a "
@@ -189,6 +181,9 @@ class TurnRequest(BaseModel):
 
 
 class ResetRequest(BaseModel):
+    x: float = Field(default=0.0, description="where to put it (default: the origin)")
+    y: float = 0.0
+    heading: float = 0.0
     username: str = Username
 
 
@@ -429,19 +424,15 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         check_name(name)
         return call(backend.turn, name, body.angle, body.username)
 
-    @app.post("/api/robots/{name}/place", tags=["drive"], dependencies=write)
-    def place(name: str, body: PlaceRequest):
-        """Teleport: works for every kind, even one that cannot move itself
-        (the page does this when you drag a robot)"""
-        check_name(name)
-        return call(backend.place, name, body.x, body.y, body.heading,
-                    body.username)
-
     @app.post("/api/robots/{name}/reset", tags=["drive"], dependencies=write)
     def reset(name: str, body: Optional[ResetRequest] = None):
+        """Put the robot at x, y facing heading (default: the origin),
+        on the ground.  Every kind, even one that cannot move itself
+        (the page does this when you drag a robot)"""
         check_name(name)
-        username = body.username if body else "anonymous"
-        return call(backend.reset, name, username)
+        body = body or ResetRequest()
+        return call(backend.reset, name, body.username, body.x, body.y,
+                    body.heading)
 
     @app.get("/api/robots/{name}/history", tags=["robots"])
     def history(name: str, limit: int = 100):

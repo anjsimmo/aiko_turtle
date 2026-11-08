@@ -36,6 +36,10 @@ body.view-chat #messages { height:min(70vh,900px); }
 .panel h2 { font-family:"Sora",sans-serif; font-size:0.95rem; margin:0 0 10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .panel h2 span { color:var(--muted); font-weight:normal; font-size:0.78rem; font-family:"IBM Plex Mono",monospace; }
 .panel h2 a { font-size:0.72rem; font-weight:normal; font-family:"IBM Plex Mono",monospace; margin-left:auto; }
+#zoom { display:inline-flex; gap:4px; }
+#zoom button { background:var(--surface); color:var(--ink); border:1px solid var(--line); padding:2px 8px; font-size:0.72rem; }
+#zoom button:hover { border-color:var(--accent); opacity:1; }
+#zoom button.on { border-color:var(--accent); color:var(--accent); }
 canvas { display:block; width:100%; height:auto; aspect-ratio:1/1; cursor:grab; touch-action:none; }
 canvas.dragging { cursor:grabbing; }
 #robots { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px; font-size:0.78rem; }
@@ -50,6 +54,7 @@ input, select { font-family:inherit; font-size:0.8rem; padding:5px 8px;
 #pose { color:var(--accent); font-size:0.8rem; margin-top:8px; min-height:1.2em; }
 #kindinfo { color:var(--muted); font-size:0.74rem; margin-top:6px; line-height:1.5; }
 #kindinfo code { color:var(--accent); }
+.hintline { color:var(--muted); font-size:0.7rem; margin-top:4px; }
 button { font-family:"IBM Plex Mono",monospace; font-size:0.78rem;
          background:var(--accent); color:var(--bg); border:none;
          border-radius:4px; padding:6px 12px; cursor:pointer; }
@@ -90,7 +95,7 @@ a { color:var(--accent); }
 <div id="status"><span id="conn">connecting…</span><span id="connhelp" class="warn"></span></div>
 <main id="grid">
 <section class="panel" id="worldpanel">
-  <h2>World <span id="world"></span><a href="/world">full map</a></h2>
+  <h2>World <span id="world"></span><span id="zoom"><button type="button" id="zin" title="zoom in (or scroll on the map)">+</button><button type="button" id="zout" title="zoom out">&minus;</button><button type="button" id="zfit" title="show every robot">fit all</button></span><a href="/world">full map</a></h2>
   <canvas id="c" width="600" height="600"></canvas>
   <ul id="robots"></ul>
   <form id="create" autocomplete="off">
@@ -100,6 +105,7 @@ a { color:var(--accent); }
   </form>
   <div id="kindinfo"></div>
   <div id="pose"></div>
+  <div class="hintline" id="maphelp">scroll to zoom, drag the ground to pan, drag a robot to move it</div>
 </section>
 <section class="panel" id="chatpanel">
   <h2>#<select id="channel" aria-label="channel"></select> <span id="chatstate"></span><a href="/chat">full chat</a></h2>
@@ -192,7 +198,8 @@ function colors() {
   var s = getComputedStyle(document.documentElement);
   return { line: s.getPropertyValue("--line").trim(), muted: s.getPropertyValue("--muted").trim(), bg: s.getPropertyValue("--surface").trim() };
 }
-function bounds() {
+var cam = null;     // null: fit every robot and trail; else a fixed view {cx, cy, span}
+function fitBounds() {
   var xs = [0], ys = [0];
   Object.values(robots).forEach(function (r) { r.trail.forEach(function (p) { xs.push(p[0]); ys.push(p[1]); }); });
   var minX = Math.min.apply(null, xs) - 60, maxX = Math.max.apply(null, xs) + 60;
@@ -200,6 +207,27 @@ function bounds() {
   var span = Math.max(maxX - minX, maxY - minY, 300);
   return { minX: (minX + maxX) / 2 - span / 2, minY: (minY + maxY) / 2 - span / 2, span: span };
 }
+function bounds() {
+  if (!cam) return fitBounds();
+  return { minX: cam.cx - cam.span / 2, minY: cam.cy - cam.span / 2, span: cam.span };
+}
+function zoomBy(factor, at) {           // at: world point that stays put (default: the centre)
+  var b = bounds(), span = Math.min(Math.max(b.span * factor, 40), 1e6);
+  at = at || [b.minX + b.span / 2, b.minY + b.span / 2];
+  var minX = at[0] - (at[0] - b.minX) * (span / b.span), minY = at[1] - (at[1] - b.minY) * (span / b.span);
+  cam = { cx: minX + span / 2, cy: minY + span / 2, span: span };
+  document.getElementById("zfit").className = ""; draw();
+}
+function fitAll() { cam = null; document.getElementById("zfit").className = "on"; draw(); }
+document.getElementById("zin").addEventListener("click", function () { zoomBy(1 / 1.5); });
+document.getElementById("zout").addEventListener("click", function () { zoomBy(1.5); });
+document.getElementById("zfit").addEventListener("click", fitAll);
+document.getElementById("zfit").className = "on";
+canvas.addEventListener("wheel", function (e) {
+  if (!view) return;
+  e.preventDefault();
+  zoomBy(e.deltaY > 0 ? 1.25 : 1 / 1.25, view.inv(canvasPoint(e)));
+}, { passive: false });
 var view = null;    // the last draw's transform, for drag-to-teleport
 function draw() {
   var c = colors(), b = bounds();
@@ -224,8 +252,10 @@ function draw() {
     ctx.fillStyle = c.muted; ctx.font = "12px 'IBM Plex Mono',monospace";
     ctx.fillText("no robots yet — create one below", 20, 30);
   }
+  var offscreen = [];
   names.forEach(function (name) {
-    var r = robots[name], col = colorOf(name);
+    var r = robots[name], col = colorOf(name), sp = T([r.x, r.y]);
+    if (sp[0] < -10 || sp[0] > S + 10 || sp[1] < -10 || sp[1] > S + 10) offscreen.push([name, sp, col]);
     if (r.trail.length > 1) {
       ctx.strokeStyle = col; ctx.lineWidth = name === selected ? 3 : 2; ctx.lineCap = "round";
       ctx.globalAlpha = name === selected || !selected ? 1 : 0.5;
@@ -241,6 +271,18 @@ function draw() {
     ctx.restore();
     ctx.fillStyle = col; ctx.font = "11px 'IBM Plex Mono',monospace";
     ctx.fillText(name + (z > 0 ? " \u2191" + z.toFixed(0) : ""), rp[0] + 22 * scale, rp[1] + 24 * scale);
+  });
+  // robots outside the view: an arrow on the edge pointing their way, with the name
+  offscreen.forEach(function (o) {
+    var name = o[0], p = o[1], col = o[2], m = 16;
+    var cx = S / 2, cy = S / 2, dx = p[0] - cx, dy = p[1] - cy, k = Math.min((S / 2 - m) / Math.abs(dx || 1e-9), (S / 2 - m) / Math.abs(dy || 1e-9));
+    var ex = cx + dx * k, ey = cy + dy * k, ang = Math.atan2(dy, dx);
+    ctx.save(); ctx.translate(ex, ey); ctx.rotate(ang);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, 7); ctx.lineTo(-3, 0); ctx.lineTo(-6, -7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = col; ctx.font = "10px 'IBM Plex Mono',monospace"; ctx.textAlign = ex > S * 0.7 ? "right" : "left";
+    ctx.fillText(name + " \u2192 " + Math.round(Math.hypot(robots[name].x - (b.minX + b.span / 2), robots[name].y - (b.minY + b.span / 2))), ex + (ex > S * 0.7 ? -14 : 14), ey + (ey < 20 ? 14 : ey > S - 20 ? -8 : 4));
+    ctx.textAlign = "left";
   });
   var sel = robots[selected];
   document.getElementById("pose").textContent = sel ?
@@ -260,21 +302,33 @@ canvas.addEventListener("pointerdown", function (e) {
     var p = view.T([robots[name].x, robots[name].y]), d = Math.hypot(p[0] - q[0], p[1] - q[1]);
     if (d < best) { best = d; hit = name; }
   });
-  if (!hit) return;
+  if (!hit) {                          // empty ground: pan the view
+    var b = bounds();
+    panning = { from: q, cam: { cx: b.minX + b.span / 2, cy: b.minY + b.span / 2, span: b.span } };
+    canvas.setPointerCapture(e.pointerId); canvas.className = "dragging"; e.preventDefault();
+    return;
+  }
   dragging = { name: hit, at: q, moved: false }; selected = hit; renderRobots(); draw();
   canvas.setPointerCapture(e.pointerId); canvas.className = "dragging"; e.preventDefault();
 });
+var panning = null;
 canvas.addEventListener("pointermove", function (e) {
+  if (panning) {
+    var q = canvasPoint(e), k = panning.cam.span / S;
+    cam = { cx: panning.cam.cx - (q[0] - panning.from[0]) * k, cy: panning.cam.cy + (q[1] - panning.from[1]) * k, span: panning.cam.span };
+    document.getElementById("zfit").className = ""; draw(); return;
+  }
   if (!dragging) return;
   dragging.at = canvasPoint(e); dragging.moved = true; draw();
 });
 function endDrag(e) {
+  if (panning) { panning = null; canvas.className = ""; return; }
   if (!dragging) return;
   var d = dragging; dragging = null; canvas.className = "";
   if (d.moved && view) {
     var w = view.inv(d.at);
-    api("/api/robots/" + d.name + "/place", "POST", { x: Math.round(w[0]), y: Math.round(w[1]), username: me() })
-      .then(function (res) { if (!res.ok) document.getElementById("pose").textContent = "place failed: " + explain(res); });
+    api("/api/robots/" + d.name + "/reset", "POST", { x: Math.round(w[0]), y: Math.round(w[1]), heading: robots[d.name] ? robots[d.name].heading : 0, username: me() })
+      .then(function (res) { if (!res.ok) document.getElementById("pose").textContent = "move failed: " + explain(res); });
   }
   draw();
 }

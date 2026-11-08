@@ -12,8 +12,7 @@
 #   destroy_robot name [topic_path_response]
 #   apply_move name distance [username] [topic_path_response]   ;; distance: N or (F L U)
 #   apply_turn name angle    [username] [topic_path_response]
-#   apply_place name x y heading [username] [topic_path_response]   ;; heading "-" keeps it
-#   reset name               [username] [topic_path_response]
+#   reset name [x y heading] [username] [topic_path_response]  ;; no x y: the origin
 #   get_pose name topic_path_response
 #   list_robots topic_path_response        ;; N responses, with host and owner
 #   get_history name limit topic_path_response
@@ -99,14 +98,10 @@ class VirtualWorld(aiko.Actor):
         self._do("turn", topic_path_response,
                  self.world.turn, name, angle, username)
 
-    def apply_place(self, name, x, y, heading="-", username="anonymous",
-                    topic_path_response=None):
-        self._do("place", topic_path_response,
-                 self.world.place, name, x, y, heading, username)
-
-    def reset(self, name, username="anonymous", topic_path_response=None):
+    def reset(self, name, x=0.0, y=0.0, heading=0.0, username="anonymous",
+              topic_path_response=None):
         self._do("reset", topic_path_response,
-                 self.world.reset, name, username)
+                 self.world.reset, name, x, y, heading, username)
 
     def get_pose(self, name, topic_path_response):
         self._do("pose", topic_path_response, self.world.get, name)

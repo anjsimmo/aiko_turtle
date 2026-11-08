@@ -6,7 +6,7 @@ import re
 import threading
 import time
 
-COMMANDS = ("move D | move F L [U], turn A, stop, reset, place X Y [H], "
+COMMANDS = ("move D | move F L [U], turn A, stop, reset [X Y [H]], "
             "grasp, release, look, telemetry, interfaces, join C")
 
 ROBOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -29,12 +29,12 @@ def parse_command(text):
             return "turn", [angle]
         case ["stop"]:
             return "stop", []
-        case ["reset"] | ["home"]:
+        case ["reset" | "home" | "place" | "teleport" | "goto"]:
             return "reset", []
-        case ["place" | "teleport" | "goto", x, y]:
-            return "place", [x, y]
-        case ["place" | "teleport" | "goto", x, y, heading]:
-            return "place", [x, y, heading]
+        case ["reset" | "home" | "place" | "teleport" | "goto", x, y]:
+            return "reset", [x, y]
+        case ["reset" | "home" | "place" | "teleport" | "goto", x, y, heading]:
+            return "reset", [x, y, heading]
         case ["grasp"] | ["grab"] | ["close"]:
             return "grasp", []
         case ["release"] | ["open"]:

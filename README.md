@@ -149,12 +149,12 @@ WebSocket at `/ws`; `/events` is the same as server-sent events.
 @@my_turtle move 100         ;; <Move>, replies with the new pose
 @@my_drone move 100 0 30     ;; a vector: forward, left, up (as many axes as the kind has)
 @@my_turtle turn 90          ;; degrees counter-clockwise
-@@my_pi place 100 -50        ;; teleport, any kind
+@@my_pi reset 100 -50        ;; put it there (any kind); plain "reset" = the origin
 @@my_arm grasp               ;; <Grasp>, kinds with a gripper
 @@my_turtle look             ;; <Perceive>
 @@my_turtle telemetry        ;; <Telemetry>
 @@my_turtle interfaces       ;; <Robot>
-@@my_turtle reset
+@@my_turtle reset            ;; the origin, or "reset X Y [H]" for anywhere
 @@pilot move my_turtle in a star shape   ;; the LLM agent
 ```
 
@@ -197,8 +197,8 @@ claude mcp add turtle -e TURTLE_URL=https://turtle.aiko.hashtag.ai -- python3 $P
 A kind decides the sprite on the map, the chat commands a robot accepts
 (`@@pi move 10` gets "a pi cannot move", `@@turtle move 0 50` gets "a
 turtle cannot move left"), how many axes `move` takes, and the aspect
-tags it registers with. `place X Y` teleports any kind, and so does
-dragging it on the map. Register a robot of a kind and `aiko_registrar list` shows exactly
+tags it registers with. `reset X Y [H]` puts any kind anywhere (plain
+`reset` is the origin), and so does dragging it on the map. Register a robot of a kind and `aiko_registrar list` shows exactly
 what it can do.
 
 **Adding a kind** (a pull request is very welcome, or fork and build your

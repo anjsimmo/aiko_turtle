@@ -17,10 +17,10 @@
 # every robot created through the REST API, with host_robot().
 #
 # Chat commands: move D (or move F L [U], a vector in the robot's frame:
-# forward, left, up, as many axes as the kind has), turn A, stop, reset,
-# place X Y [H], grasp, release, look, telemetry, interfaces, join CHANNEL
-# (those the kind supports; "place" teleports any kind).  Only messages
-# STARTING with "@@name" are commands.
+# forward, left, up, as many axes as the kind has), turn A, stop,
+# reset [X Y [H]] (the origin, or anywhere: works for every kind), grasp,
+# release, look, telemetry, interfaces, join CHANNEL (those the kind
+# supports).  Only messages STARTING with "@@name" are commands.
 
 import click
 
@@ -138,13 +138,9 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
     def stop(self):
         return "stopped (a virtual turtle moves instantly, nothing to stop)"
 
-    def reset(self, username="anonymous"):
+    def reset(self, x=0, y=0, heading=0, username="anonymous"):
+        """Not part of <Move>: a Pi can be put somewhere too"""
         return self._with_world(lambda world: world.reset(
-            self.robot_name, username, self.world_response_topic))
-
-    def place(self, x, y, heading="-", username="anonymous"):
-        """Teleport (not part of <Move>: a Pi can be put somewhere too)"""
-        return self._with_world(lambda world: world.apply_place(
             self.robot_name, x, y, heading, username, self.world_response_topic))
 
     # -- <Grasp> -------------------------------------------------------------
@@ -233,9 +229,7 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
             case "stop":
                 return self.stop()
             case "reset":
-                return self.reset(username)
-            case "place":
-                return self.place(*arguments, username=username)
+                return self.reset(*arguments, username=username)
             case "grasp":
                 return self.grasp()
             case "release":

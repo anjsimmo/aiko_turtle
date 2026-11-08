@@ -236,14 +236,9 @@ class AikoBackend(aiko.Actor):
         return self._robot(self._request(lambda world, topic:
             world.apply_turn(name, angle, username, topic))[0])
 
-    def place(self, name, x, y, heading, username):
+    def reset(self, name, username, x=0.0, y=0.0, heading=0.0):
         return self._robot(self._request(lambda world, topic:
-            world.apply_place(name, x, y, "-" if heading is None else heading,
-                              username, topic))[0])
-
-    def reset(self, name, username):
-        return self._robot(self._request(lambda world, topic:
-            world.reset(name, username, topic))[0])
+            world.reset(name, x, y, heading, username, topic))[0])
 
     def history(self, name, limit):
         rows = self._request(

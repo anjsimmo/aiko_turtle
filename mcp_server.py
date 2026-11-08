@@ -97,19 +97,12 @@ def turn(name: str, angle: float, username: str = AGENT_NAME) -> dict:
 
 
 @mcp.tool()
-def place(name: str, x: float, y: float, heading: float | None = None,
+def reset(name: str, x: float = 0, y: float = 0, heading: float = 0,
           username: str = AGENT_NAME) -> dict:
-    """Teleport a robot to (x, y), optionally facing heading; any kind"""
-    body = {"x": x, "y": y, "username": username}
-    if heading is not None:
-        body["heading"] = heading
-    return call("POST", f"/api/robots/{name}/place", body)
-
-
-@mcp.tool()
-def reset(name: str, username: str = AGENT_NAME) -> dict:
-    """Put a robot back at the origin, heading 0"""
-    return call("POST", f"/api/robots/{name}/reset", {"username": username})
+    """Put a robot at (x, y) facing heading, on the ground; no arguments =
+    the origin.  Works for every kind, even ones that cannot move"""
+    return call("POST", f"/api/robots/{name}/reset",
+                {"x": x, "y": y, "heading": heading, "username": username})
 
 
 @mcp.tool()

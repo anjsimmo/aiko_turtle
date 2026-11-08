@@ -81,20 +81,18 @@ class World:
         record["heading"] = round((record["heading"] + angle) % 360, 3)
         return self._moved(record, username, "turn", angle)
 
-    def place(self, name, x, y, heading=None, username="anonymous"):
-        """Teleport: any kind, even one that cannot move by itself"""
+    def reset(self, name, x=0.0, y=0.0, heading=0.0, username="anonymous"):
+        """Put the robot at (x, y) facing heading, on the ground.  No
+        arguments: the origin.  Works for every kind (a Pi can be put
+        somewhere even though it cannot move), so it is not part of <Move>"""
         record = self._record(name)
         record["x"] = round(_number(x, "x"), 3) + 0.0
         record["y"] = round(_number(y, "y"), 3) + 0.0
-        if heading is not None and heading != "-":
-            record["heading"] = round(_number(heading, "heading") % 360, 3)
-        return self._moved(record, username, "place", f"{record['x']:g},{record['y']:g}")
-
-    def reset(self, name, username="anonymous"):
-        record = self._record(name)
-        record["x"], record["y"], record["heading"] = 0.0, 0.0, 0.0
+        record["heading"] = round(_number(heading, "heading") % 360, 3)
         record["z"] = 0.0
-        return self._moved(record, username, "reset", "")
+        argument = "" if not (record["x"] or record["y"] or record["heading"])  \
+            else f"{record['x']:g},{record['y']:g},{record['heading']:g}"
+        return self._moved(record, username, "reset", argument)
 
     def history(self, name, limit=100):
         self._record(name)

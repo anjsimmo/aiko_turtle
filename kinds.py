@@ -60,12 +60,12 @@ DEFAULT_KIND = "turtle"
 
 # Which Interface each chat command needs (core.parse_command names)
 COMMAND_INTERFACES = {
-    "move": "Move", "turn": "Move", "stop": "Move", "reset": "Move",
+    "move": "Move", "turn": "Move", "stop": "Move",
     "grasp": "Grasp", "release": "Grasp",
     "look": "Perceive",
     "telemetry": "Telemetry",
     "interfaces": None, "join": None,       # every robot
-    "place": None,                          # teleport: god mode, any kind
+    "reset": None,                          # reset [X Y [H]]: put it somewhere, any kind
 }
 
 

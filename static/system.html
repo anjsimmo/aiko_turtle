@@ -64,10 +64,10 @@ a { color:var(--accent); }
   <p>What the web server sees on the broker, with the token. Topics must start with <code>aiko/</code>.</p>
   <form class="row" id="watchform">
     <input type="text" id="watchtopic" value="aiko/+/+/+/robots" placeholder="topic, + and # allowed" spellcheck="false">
-    <select id="watchsecs"><option>2</option><option selected>5</option><option>10</option><option>30</option></select>
-    <button type="submit">watch</button>
+    <button type="submit" id="watchbtn">watch</button>
+    <span id="watchstate" class="hint"></span>
   </form>
-  <pre id="watchout"></pre>
+  <pre id="watchout">(live: every message on the topic appears here as it arrives; a new topic restarts the stream)</pre>
   <form class="row" id="pubform">
     <input type="text" id="pubtopic" placeholder="aiko/HOST/PID/SID/in" spellcheck="false">
     <input type="text" id="pubpayload" placeholder="(move 100 @me)" spellcheck="false">
@@ -112,20 +112,41 @@ function hms(ts) {
   var d = new Date(typeof ts === "number" && ts < 1e12 ? ts * 1000 : ts);
   return isNaN(d) ? "--:--:--" : d.toTimeString().slice(0, 8);
 }
+// Live: a server-sent-events stream of the topic, until stopped.  The
+// token goes in the URL because EventSource cannot send headers
+var watching = null, watchLines = 0;
+var watchOut = document.getElementById("watchout"), watchState = document.getElementById("watchstate"), watchBtn = document.getElementById("watchbtn");
+function stopWatch() {
+  if (watching) { watching.close(); watching = null; }
+  watchBtn.textContent = "watch"; watchState.textContent = "";
+}
+function startWatch(topic) {
+  stopWatch();
+  var t = token.value.trim();
+  if (!t && lock.className.indexOf("show") >= 0) { watchOut.textContent = needToken(); return; }
+  watchOut.textContent = ""; watchLines = 0;
+  watchState.textContent = "connecting to " + topic + "\u2026";
+  watching = new EventSource("/api/mqtt/events?topic=" + encodeURIComponent(topic) + (t ? "&token=" + encodeURIComponent(t) : ""));
+  watchBtn.textContent = "stop";
+  watching.onopen = function () { watchState.textContent = "streaming " + topic; };
+  watching.onerror = function () {
+    // a 401 or 422 closes the stream before it opens; EventSource gives no status, so say so
+    if (watching && watching.readyState === EventSource.CLOSED) { watchState.textContent = "stream closed: token missing or topic not under aiko/ ?"; watchBtn.textContent = "watch"; watching = null; }
+    else watchState.textContent = "reconnecting\u2026";
+  };
+  watching.onmessage = function (ev) {
+    var m = JSON.parse(ev.data);
+    watchOut.textContent += (watchLines ? "\n" : "") + hms(m.timestamp) + "  " + m.topic + "  " + m.payload;
+    if (++watchLines > 500) { var lines = watchOut.textContent.split("\n"); watchOut.textContent = lines.slice(-400).join("\n"); watchLines = 400; }
+    watchOut.scrollTop = watchOut.scrollHeight;
+  };
+}
 document.getElementById("watchform").addEventListener("submit", function (e) {
   e.preventDefault();
-  var topic = document.getElementById("watchtopic").value.trim(), secs = document.getElementById("watchsecs").value, out = document.getElementById("watchout");
-  out.textContent = "listening for " + secs + " s…";
-  fetch("/api/mqtt?topic=" + encodeURIComponent(topic) + "&seconds=" + secs, { headers: authHeaders() }).then(function (r) {
-    if (r.status === 401) { out.textContent = needToken(); return null; }
-    if (!r.ok) { return r.text().then(function (t) { out.textContent = "error " + r.status + ": " + t; return null; }); }
-    return r.json();
-  }).then(function (d) {
-    if (!d) return;
-    var msgs = Array.isArray(d) ? d : (d.messages || []);
-    out.textContent = msgs.length ? msgs.map(function (m) { return hms(m.timestamp !== undefined ? m.timestamp : m.time) + "  " + m.topic + "  " + m.payload; }).join("\n") : "(nothing in " + secs + " s)";
-  }).catch(function (err) { out.textContent = "error: " + err; });
+  if (watching) { stopWatch(); return; }
+  startWatch(document.getElementById("watchtopic").value.trim());
 });
+window.addEventListener("pagehide", stopWatch);
 document.getElementById("pubform").addEventListener("submit", function (e) {
   e.preventDefault();
   var state = document.getElementById("pubstate");
@@ -161,6 +182,7 @@ function render() {
       a.addEventListener("click", function () {
         document.getElementById("pubtopic").value = svc.topic_path + "/in";
         document.getElementById("watchtopic").value = svc.topic_path + "/#";
+        if (watching) startWatch(svc.topic_path + "/#");
         document.getElementById("watchpanel").scrollIntoView({ behavior: "smooth" });
       });
       tp.append(a); cell(tr, svc.name); cell(tr, svc.protocol); cell(tr, svc.owner); cell(tr, (svc.tags || []).join(" "), "tags");

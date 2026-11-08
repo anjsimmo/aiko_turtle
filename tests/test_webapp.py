@@ -61,8 +61,8 @@ class FakeBackend:
     def turn(self, name, angle, username):
         return self._guard(self.world.turn, name, angle, username)
 
-    def reset(self, name, username):
-        return self._guard(self.world.reset, name, username)
+    def reset(self, name, username, x=0.0, y=0.0, heading=0.0):
+        return self._guard(self.world.reset, name, x, y, heading, username)
 
     def pose(self, name):
         return self._guard(self.world.get, name)
@@ -159,11 +159,13 @@ def test_place_and_create_position(client):
     pi = client.post("/api/robots", json={"name": "pi1", "kind": "pi",
                      "x": 120, "y": -40, "heading": 45}).json()
     assert (pi["x"], pi["y"], pi["heading"]) == (120.0, -40.0, 45.0)
-    moved = client.post("/api/robots/pi1/place", json={"x": 5, "y": 6}).json()
-    assert (moved["x"], moved["y"], moved["heading"]) == (5.0, 6.0, 45.0)
-    assert client.post("/api/robots/pi1/place",
+    moved = client.post("/api/robots/pi1/reset", json={"x": 5, "y": 6}).json()
+    assert (moved["x"], moved["y"], moved["heading"]) == (5.0, 6.0, 0.0)
+    assert client.post("/api/robots/pi1/reset",
                        json={"x": 0, "y": 0, "heading": 90}).json()["heading"] == 90.0
-    assert client.get("/api/robots/pi1/history").json()[-1]["command"] == "place"
+    home = client.post("/api/robots/pi1/reset").json()
+    assert (home["x"], home["y"], home["heading"]) == (0.0, 0.0, 0.0)
+    assert client.get("/api/robots/pi1/history").json()[-1]["command"] == "reset"
 
 
 def test_move_vectors(client):
