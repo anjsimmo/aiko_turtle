@@ -131,6 +131,8 @@ curl -X POST localhost:8123/api/robots/my_turtle/turn -H 'Content-Type: applicat
      -d '{"angle": 90, "username": "me"}'
 curl -X POST localhost:8123/api/robots/my_turtle/move -H 'Content-Type: application/json' \
      -d '{"distance": 100, "username": "me"}'
+curl -X POST localhost:8123/api/robots/my_arm/command -H 'Content-Type: application/json' \
+     -d '{"command": "grasp", "username": "me"}'   # any chat command: grasp, release, telemetry, ...
 curl localhost:8123/api/robots                 # everyone's robots
 curl localhost:8123/api/robots/my_turtle/history
 curl -N localhost:8123/events                  # live poses + chat (SSE)

@@ -27,7 +27,7 @@ import click
 import aiko_services as aiko
 from aiko_services.main.discovery import get_service_proxy
 from aiko_services.main.share import services_cache_create_singleton
-from aiko_services.main.utilities import parse
+from aiko_services.main.utilities import generate, parse
 from aiko_chat import ChatServer, get_server_service_filter
 import aiko_chat.bot as bot
 from aiko_chat.protocol import _decode_message
@@ -246,6 +246,28 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
             case _:
                 return arguments            # the error text
 
+    def command(self, chat_command, username="anonymous",
+                topic_path_response=None):
+        """Any chat command, as a remote function call with the reply on
+        topic_path_response: (response ok TEXT) or (response error TEXT).
+        The web server's POST /api/robots/NAME/command uses this for the
+        commands the world does not answer (grasp, release, telemetry, ...)"""
+        method, arguments = parse_command(chat_command)
+        if method is None:
+            status, reply = "error", arguments
+        elif not supports(self.kind, method):
+            status, reply = "error", self.run_command(chat_command, username)
+        else:
+            status = "ok"
+            reply = self.run_command(chat_command, username)  \
+                or "sent, the world replies in the chat"
+        self.print(f"{username} (direct): {chat_command} -> {reply}")
+        if topic_path_response:
+            aiko.process.message.publish(topic_path_response, "(item_count 1)")
+            aiko.process.message.publish(
+                topic_path_response, generate("response", [status, reply]))
+        return reply
+
     # -- hosting -------------------------------------------------------------
 
     def detach(self):
@@ -278,12 +300,12 @@ def _pose_words(fields):
         return " ".join(str(field) for field in fields[1:])
 
 
-def robot_tags(robot_name, channel, kind):
+def robot_tags(robot_name, channel, kind, world_name=config.WORLD_NAME):
     """Aspect tags per ADR-025: one per Interface this robot implements"""
     interfaces = ["Chat", "Robot", *kind_interfaces(kind)]
     return ["ec=true", "type=chat_robot", *aspect_tags(interfaces),
             f"botname=@@{robot_name}", f"channel={channel}", f"kind={kind}",
-            f"axes={kind_axes(kind)}",
+            f"axes={kind_axes(kind)}", f"world={world_name}",
             f"commands={','.join(kind_commands(kind))}"]
 
 
@@ -293,7 +315,7 @@ def host_robot(robot_name, kind=DEFAULT_KIND, owner="anonymous",
     """Create the ChatRobotAgent Actor in this process and return it"""
     init_args = aiko.actor_args(
         robot_name, protocol=ROBOT_PROTOCOL,
-        tags=robot_tags(robot_name, channel, kind))
+        tags=robot_tags(robot_name, channel, kind, world_name))
     init_args.update({"robot_name": robot_name, "channel": channel,
                       "world_name": world_name, "kind": kind,
                       "owner": owner, "host": host})

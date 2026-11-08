@@ -123,7 +123,7 @@ aiko.process.run()</pre>
 <p>The full version with the Registrar lookup is <code>examples/agent_bot.py</code>; <code>agent.py</code> is the same with an LLM deciding the commands.</p>
 <h3>How a robot is described</h3>
 <p>Every robot registers with one tag per Interface it implements, following Aiko's aspect-tag convention, plus a few for the chat and the agent:</p>
-<pre>chat=0 robot=0 move=0 perceive=0 telemetry=0 botname=@@my_turtle channel=__CHANNEL__ kind=turtle commands=move,turn,...</pre>
+<pre>chat=0 robot=0 move=0 perceive=0 telemetry=0 botname=@@my_turtle channel=__CHANNEL__ kind=turtle world=turtle_world commands=move,turn,...</pre>
 <p>So a client asks the Registrar for <code>tags=["move=0"]</code> and gets every robot that can move, whatever it is. A kind with no <code>&lt;Move&gt;</code> (a Raspberry Pi) simply does not match. The Interfaces are in <code>interfaces.py</code>: <code>&lt;Chat&gt;</code>, <code>&lt;Robot&gt;</code>, <code>&lt;Move&gt;</code>, <code>&lt;Grasp&gt;</code>, <code>&lt;Perceive&gt;</code>, <code>&lt;Telemetry&gt;</code>.</p>
 
 <h2 id="rest">3. REST, no Python needed</h2>
@@ -143,6 +143,8 @@ curl __BASE__/api/robots                 # everyone's robots
 curl __BASE__/api/kinds                  # what each kind can do
 curl __BASE__/api/robots/my_turtle/history
 curl -N __BASE__/events                  # live poses and chat (server-sent events)
+curl -X POST __BASE__/api/robots/NAME/command -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"command": "grasp", "username": "@me"}'        # any chat command: grasp, release, telemetry, interfaces, ...
 curl -X POST __BASE__/api/chat -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
      -d '{"message": "@@my_turtle look", "username": "@me", "channel": "__CHANNEL__"}'
 curl -X DELETE __BASE__/api/robots/my_turtle -H "Authorization: Bearer $TOKEN"</pre>
@@ -152,7 +154,7 @@ curl -X DELETE __BASE__/api/robots/my_turtle -H "Authorization: Bearer $TOKEN"</
 <h2 id="agents">4. Agents and LLMs</h2>
 <p>An agent with Python should use Aiko (section 2): discovery by tags, direct calls, its own Services. <code>examples/agent_bot.py</code> is the template, and <code>agent.py</code> (the <code>__AGENT__</code> you see in the chat) is the same shape with an LLM in the middle and a rate limit. An agent without Python, or inside a tool that speaks MCP, has two no-install paths.</p>
 <h3>MCP</h3>
-<p><code>mcp_server.py</code> exposes the robots as tools over the Model Context Protocol (stdio): <code>list_robots</code>, <code>list_kinds</code>, <code>create_robot</code>, <code>move</code>, <code>turn</code>, <code>reset</code>, <code>history</code>, <code>chat</code>, <code>read_chat</code>, <code>destroy_robot</code>. It is a wrapper over the REST API, so it needs only <code>pip install mcp</code>.</p>
+<p><code>mcp_server.py</code> exposes the robots as tools over the Model Context Protocol (stdio): <code>list_robots</code>, <code>list_kinds</code>, <code>create_robot</code>, <code>move</code>, <code>turn</code>, <code>reset</code>, <code>command</code> (grasp, release, telemetry, ...), <code>history</code>, <code>chat</code>, <code>read_chat</code>, <code>destroy_robot</code>. It is a wrapper over the REST API, so it needs only <code>pip install mcp</code>.</p>
 <pre># Claude Code
 claude mcp add turtle -e TURTLE_URL=__BASE__ -- python3 /path/to/aiko_turtle/mcp_server.py
 

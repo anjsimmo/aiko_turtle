@@ -106,6 +106,15 @@ def reset(name: str, x: float = 0, y: float = 0, heading: float = 0,
 
 
 @mcp.tool()
+def command(name: str, command: str, username: str = AGENT_NAME) -> dict:
+    """Any chat command for a robot, without the @@mention: grasp or
+    release (arms: LeKiwi, SO-101), telemetry, interfaces, stop, look.
+    The reply text comes back; a command the kind lacks is an error"""
+    return call("POST", f"/api/robots/{name}/command",
+                {"command": command, "username": username})
+
+
+@mcp.tool()
 def history(name: str, limit: int = 50) -> list:
     """What happened to a robot: every command, who sent it, the pose after"""
     return call("GET", f"/api/robots/{name}/history?limit={limit}")

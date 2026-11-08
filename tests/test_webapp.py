@@ -64,6 +64,13 @@ class FakeBackend:
     def reset(self, name, username, x=0.0, y=0.0, heading=0.0):
         return self._guard(self.world.reset, name, x, y, heading, username)
 
+    def command(self, name, chat_command, username):
+        if chat_command.startswith("move "):
+            return self.move(name, float(chat_command.split()[1]), username)
+        if chat_command == "grasp":
+            return {"name": name, "command": chat_command, "reply": "gripper closed"}
+        raise BackendError(422, f"a turtle cannot {chat_command}")
+
     def pose(self, name):
         return self._guard(self.world.get, name)
 
@@ -179,6 +186,18 @@ def test_move_vectors(client):
     assert client.post("/api/robots/t1/move", json={"distance": [1, 2, 3, 4]}).status_code == 422
     client.post("/api/robots", json={"name": "k1", "kind": "lekiwi"})
     assert client.post("/api/robots/k1/move", json={"distance": [0, 50]}).json()["y"] == 50.0
+
+
+def test_command(client):
+    client.post("/api/robots", json={"name": "arm", "kind": "lekiwi", "owner": "me"})
+    response = client.post("/api/robots/arm/command", json={"command": "grasp"})
+    assert response.status_code == 200
+    assert response.json()["reply"] == "gripper closed"
+    assert client.post("/api/robots/arm/command",
+                       json={"command": "move 10"}).json()["x"] == 10
+    assert client.post("/api/robots/arm/command",
+                       json={"command": "fly"}).status_code == 422
+    assert client.post("/api/robots/arm/command", json={}).status_code == 422
 
 
 def test_mqtt_and_websocket(client):

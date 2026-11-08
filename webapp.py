@@ -49,6 +49,7 @@ class Backend:
     def reset(self, name, username, x=0.0, y=0.0, heading=0.0): ...
     def pose(self, name): ...
     def history(self, name, limit): ...         # [event, ...]
+    def command(self, name, chat_command, username): ...  # any chat command
     def send_chat(self, username, message, channel=None): ...
     def channels(self): ...                     # {"following": [...], "known": [...]}
     def follow_channel(self, channel): ...      # start relaying a channel
@@ -184,6 +185,14 @@ class ResetRequest(BaseModel):
     x: float = Field(default=0.0, description="where to put it (default: the origin)")
     y: float = 0.0
     heading: float = 0.0
+    username: str = Username
+
+
+class CommandRequest(BaseModel):
+    command: str = Field(min_length=1, max_length=200,
+                         description="a chat command without the mention, "
+                                     "e.g. grasp, release, telemetry, "
+                                     "interfaces, look, move 100")
     username: str = Username
 
 
@@ -433,6 +442,15 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         body = body or ResetRequest()
         return call(backend.reset, name, body.username, body.x, body.y,
                     body.heading)
+
+    @app.post("/api/robots/{name}/command", tags=["drive"], dependencies=write)
+    def command(name: str, body: CommandRequest):
+        """Any chat command, without the @@mention: grasp, release,
+        telemetry, interfaces, stop, look, and also move/turn/reset.
+        The robot's reply comes back here as well as in the chat, and a
+        command its kind lacks is a 422 with the robot's explanation"""
+        check_name(name)
+        return call(backend.command, name, body.command.strip(), body.username)
 
     @app.get("/api/robots/{name}/history", tags=["robots"])
     def history(name: str, limit: int = 100):

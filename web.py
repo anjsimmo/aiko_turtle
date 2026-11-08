@@ -22,12 +22,14 @@ import uvicorn
 
 import aiko_services as aiko
 from aiko_services.main.actor import ActorTopic
+from aiko_services.main.discovery import get_service_proxy
 from aiko_services.main.share import services_cache_create_singleton
 from aiko_services.main.utilities import parse
 from aiko_chat import ChatServer, get_server_service_filter
 from aiko_chat.protocol import _decode_message
 
 import config
+from core import parse_command
 from robot import ROBOT_PROTOCOL, ChatRobotAgent, host_robot
 from virtual_world import VirtualWorld
 from webapp import BackendError, EventHub, create_app
@@ -69,7 +71,7 @@ class AikoBackend(aiko.Actor):
         self.mqtt_watch_client = None   # paho client, see _mqtt_client()
         self.mqtt_lock = threading.Lock()
         self.hosted = {}            # robot name -> ChatRobotAgent (ours)
-        self.external = set()       # robots with their own live process
+        self.external = {}          # robot name -> topic path, other people's processes
         self.kinds = {}             # robot name -> kind, from the share
         self.process_prefix = self.topic_path.rsplit("/", 1)[0] + "/"
         self.request_lock = threading.Lock()
@@ -93,23 +95,38 @@ class AikoBackend(aiko.Actor):
 
     # -- other people's robot processes --------------------------------------
 
+    def _other_world(self, service_details):
+        """A robot of another VirtualWorld (a developer's own, on the
+        shared broker) is not ours to host or call"""
+        for tag in service_details[5]:
+            key, _, value = str(tag).partition("=")
+            if key == "world":
+                return value != self.world_name
+        return False
+
     def _robot_add_handler(self, service_details, service):
-        if service_details[0].startswith(self.process_prefix):
-            return                  # one of ours
+        if service_details[0].startswith(self.process_prefix)  \
+                or self._other_world(service_details):
+            return                  # one of ours, or another world's
         name = service_details[1]
-        self.external.add(name)
+        self.external[name] = service_details[0]
         if name in self.hosted:
             print(f"WEB: @@{name} now has its own process", flush=True)
-            self.unhost(name)
+            # Not here: this runs inside the services cache's handler loop
+            # and (un)hosting registers handlers of its own (aiko share.py
+            # iterates a set that would change size)
+            self._post_message(ActorTopic.IN, "unhost", [name])
 
     def _robot_remove_handler(self, service_details):
-        if service_details[0].startswith(self.process_prefix):
+        if service_details[0].startswith(self.process_prefix)  \
+                or self._other_world(service_details):
             return
         name = service_details[1]
-        self.external.discard(name)
+        self.external.pop(name, None)
         if self.world and name in self.kinds:
             print(f"WEB: @@{name} lost its own process", flush=True)
-            self.host(name, self.kinds[name])
+            self._post_message(ActorTopic.IN, "host",
+                               [name, self.kinds[name], "anonymous"])
 
     # -- world ---------------------------------------------------------------
 
@@ -154,9 +171,9 @@ class AikoBackend(aiko.Actor):
 
     # -- requests to the world, from the HTTP threads -----------------------
 
-    def _request(self, call):
-        """call(world, topic_path_response) -> the world's response rows"""
-        if not self.world:
+    def _request(self, call, need_world=True):
+        """call(world, topic_path_response) -> the response rows"""
+        if need_world and not self.world:
             raise BackendError(503, "world not connected")
         topic = f"{self.topic_path}/response/{next(self.request_ids)}"
         box = queue.Queue()
@@ -187,7 +204,9 @@ class AikoBackend(aiko.Actor):
                 raise BackendError(504, "no response from the world")
         finally:
             self.remove_message_handler(handler, topic)
-        if result and result[0][0] == "error":
+        if not result:
+            raise BackendError(504, "empty response")
+        if result[0][0] == "error":
             detail = " ".join(result[0][1:])
             status = 404 if detail.startswith("unknown robot") else 422
             raise BackendError(status, detail)
@@ -240,6 +259,36 @@ class AikoBackend(aiko.Actor):
     def reset(self, name, username, x=0.0, y=0.0, heading=0.0):
         return self._robot(self._request(lambda world, topic:
             world.reset(name, x, y, heading, username, topic))[0])
+
+    def command(self, name, chat_command, username):
+        """Any chat command over REST.  Pose commands go to the world as
+        the drive routes do; the rest are a remote call on the robot's
+        own Actor, hosted here or in someone else's process"""
+        method, arguments = parse_command(chat_command)
+        match method:
+            case "move":
+                return self.move(name, arguments[0], username)
+            case "turn":
+                return self.turn(name, arguments[0], username)
+            case "reset":
+                return self.reset(name, username, *arguments)
+            case "look":
+                return self.pose(name)
+            case None:
+                raise BackendError(422, arguments)
+        if name in self.hosted:
+            topic_path = self.hosted[name].topic_path
+        elif name in self.external:
+            topic_path = self.external[name]
+        else:
+            raise BackendError(404, f"unknown robot {name}, or it has no "
+                               "live process (create it here, or run "
+                               "robot.py)")
+        robot = get_service_proxy(f"{topic_path}/in", ChatRobotAgent)
+        rows = self._request(lambda _world, topic: robot.command(
+            chat_command, username, topic), need_world=False)
+        return {"name": name, "command": chat_command,
+                "reply": " ".join(rows[0][1:])}   # an error row raised already
 
     def history(self, name, limit):
         rows = self._request(
