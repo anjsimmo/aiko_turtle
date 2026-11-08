@@ -1,0 +1,8 @@
+# Runtime state and generated files (regenerate with ./robot_space_setup.py)
+_robot_space_/
+_world_space_/
+_chat_server_/
+logs/
+__pycache__/
+*.pyc
+*.swp

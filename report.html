@@ -1,0 +1,308 @@
+<title>TurtleBot Imagineering</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f7f6f2; --surface: #ffffff; --ink: #1c2420; --muted: #5c6b62;
+  --line: #d8ded9; --accent: #0b7a4b; --amber: #a8690f; --code-bg: #eef1ec;
+}
+:root:not([data-theme="light"]) { }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101512; --surface: #182019; --ink: #e6ece7; --muted: #93a398;
+    --line: #2a352c; --accent: #3ecf8e; --amber: #d99a3d; --code-bg: #1e2a21;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101512; --surface: #182019; --ink: #e6ece7; --muted: #93a398;
+  --line: #2a352c; --accent: #3ecf8e; --amber: #d99a3d; --code-bg: #1e2a21;
+}
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: "Public Sans", system-ui, sans-serif;
+  line-height: 1.55; margin: 0; font-size: 16px;
+}
+main { max-width: 880px; margin: 0 auto; padding: 40px 20px 80px; }
+h1, h2 { font-family: "Sora", system-ui, sans-serif; text-wrap: balance; }
+h1 { font-size: 2.1rem; margin: 6px 0 10px; }
+h2 { font-size: 1.25rem; margin: 44px 0 12px; }
+.eyebrow {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.78rem;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);
+}
+.lede { color: var(--muted); max-width: 62ch; margin: 0; }
+figure { margin: 20px 0; }
+figcaption { color: var(--muted); font-size: 0.86rem; margin-top: 8px; max-width: 70ch; }
+.panel {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 6px; padding: 16px;
+}
+.replay-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 760px) { .replay-grid { grid-template-columns: 380px 1fr; } }
+canvas { width: 100%; height: auto; display: block; }
+.replay-controls { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+button {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.82rem;
+  background: var(--accent); color: var(--bg); border: none;
+  border-radius: 4px; padding: 7px 14px; cursor: pointer;
+}
+button:hover { opacity: 0.88; }
+button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.legend { font-size: 0.8rem; color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+.legend b { font-weight: 500; }
+.legend .sq { color: var(--amber); } .legend .tr { color: var(--accent); }
+.chat {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.8rem;
+  line-height: 1.65; overflow-x: auto; margin: 0; white-space: pre;
+}
+.chat .u { color: var(--accent); font-weight: 500; }
+.chat .b { color: var(--muted); }
+.chat .rej { color: var(--amber); }
+pre.cmd {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px 16px; overflow-x: auto; font-family: "IBM Plex Mono", monospace;
+  font-size: 0.82rem; line-height: 1.6; margin: 12px 0;
+}
+pre.cmd .c { color: var(--muted); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: "Sora", sans-serif; font-size: 0.8rem; }
+td:first-child { white-space: nowrap; font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; color: var(--accent); }
+ul { padding-left: 20px; } li { margin: 6px 0; max-width: 70ch; }
+.arch svg { max-width: 100%; height: auto; }
+code { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+</style>
+
+<main>
+<p class="eyebrow">Aiko imagineering · 2026-08-22 · aiko.hashtag.ai</p>
+<h1>TurtleBot Imagineering</h1>
+<p class="lede">A virtual robot that lives in Aiko Chat: <code>&lt;Chat&gt;</code> +
+<code>&lt;Robot&gt;</code> interfaces, hyperspace-bootstrapped elements started lazily by a
+LifeCycleManager, ChatSpace membership gated on the <code>&lt;Chat&gt;</code> interface, and an
+LLM ChatAgent that discovers the robot and drives it — all four phases of the plan, working
+end-to-end on the shared broker.</p>
+
+<h2>The robot actually drove this</h2>
+<div class="replay-grid">
+  <figure class="panel" style="margin:0">
+    <canvas id="replay" width="380" height="380" role="img"
+      aria-label="Replay of the recorded robot paths: an amber path showing the out-of-order cold-start square, and a green closed triangle from the warm run"></canvas>
+    <div class="replay-controls">
+      <button id="play">replay</button>
+      <span class="legend"><b class="sq">■ square (cold)</b> · <b class="tr">■ triangle (warm)</b></span>
+    </div>
+    <figcaption>Both traces are the real recorded VirtualWorld poses. The amber square
+    was the cold-start run: elements were still lazily booting, and per-element queues
+    drained out of order, warping the square — a genuine finding. The green triangle ran
+    warm and closes exactly.</figcaption>
+  </figure>
+  <figure class="panel" style="margin:0">
+    <pre class="chat"><span class="u">robots:</span> @@anj_agent please make the turtle robot
+        draw a square with sides of 100
+<span class="u">@@anj_agent:</span> @@anj_turtlebot move 100
+<span class="b">@@anj_turtlebot: move 100: queued, lazily
+                 starting forward !!!!</span>
+<span class="u">@@anj_agent:</span> @@anj_turtlebot turn 90
+<span class="b">@@anj_turtlebot: turn 90: queued, lazily
+                 starting turn !!!!</span>
+<span class="u">@@anj_agent:</span> @@anj_turtlebot move 100
+<span class="b">@@anj_turtlebot: move 100: done !!!!</span>
+   …six more move/turn rounds…
+<span class="u">@@anj_agent:</span> @@anj_turtlebot look
+<span class="b">@@anj_turtlebot: camera: pose (0.0 -100.0 0.0) !!!!</span>
+
+<span class="u">:space_add</span> robots anj_turtlebot
+<span class="b">@@chat_space: added anj_turtlebot to #robots
+              (implements &lt;Chat&gt;)</span>
+<span class="u">:space_add</span> robots anj_turtle_world
+<span class="rej">@@chat_space: rejected: Service "anj_turtle_world"
+              does not implement &lt;Chat&gt;</span></pre>
+    <figcaption>Real transcript from the #robots channel: the ChatAgent translating
+    natural language into robot commands, and ChatSpace enforcing the
+    <code>&lt;Chat&gt;</code> membership condition.</figcaption>
+  </figure>
+</div>
+
+<h2>How the pieces talk</h2>
+<figure class="panel arch">
+<svg viewBox="0 0 840 400" role="img" aria-label="Architecture: humans and the LLM ChatAgent send chat messages through the ChatServer to the ChatRobotAgent, whose LifeCycleManager lazily spawns the camera source and motor targets that act on the VirtualWorld; the robot also registers itself in the HyperSpace robots collection">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" stroke-width="1.2">
+    <rect x="20"  y="30"  width="150" height="46" rx="4"/>
+    <rect x="20"  y="110" width="150" height="46" rx="4"/>
+    <rect x="250" y="70"  width="160" height="52" rx="4"/>
+    <rect x="490" y="60"  width="190" height="72" rx="4" stroke-width="2"/>
+    <rect x="490" y="210" width="90 " height="40" rx="4"/>
+    <rect x="600" y="210" width="90"  height="40" rx="4"/>
+    <rect x="710" y="210" width="90"  height="40" rx="4"/>
+    <rect x="565" y="310" width="160" height="46" rx="4"/>
+    <rect x="250" y="210" width="160" height="60" rx="4" stroke-dasharray="5 4"/>
+  </g>
+  <g font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor" text-anchor="middle">
+    <text x="95"  y="49">aiko_chat repl</text><text x="95" y="65" opacity="0.65">humans</text>
+    <text x="95"  y="129">ChatAgent</text><text x="95" y="145" opacity="0.65">@@anj_agent · LLM</text>
+    <text x="330" y="92">ChatServer</text><text x="330" y="108" opacity="0.65">#robots · ChatSpace</text>
+    <text x="585" y="84">ChatRobotAgent</text>
+    <text x="585" y="100" opacity="0.65">&lt;Chat&gt;+&lt;Robot&gt;</text>
+    <text x="585" y="116" opacity="0.65">LifeCycleManager</text>
+    <text x="535" y="234">Camera</text><text x="535" y="245" font-size="10" opacity="0.65">source</text>
+    <text x="645" y="234">Turn</text><text x="645" y="245" font-size="10" opacity="0.65">target</text>
+    <text x="755" y="234">Forward</text><text x="755" y="245" font-size="10" opacity="0.65">target</text>
+    <text x="645" y="330">VirtualWorld</text><text x="645" y="346" opacity="0.65">pose x y heading</text>
+    <text x="330" y="232">HyperSpace</text>
+    <text x="330" y="248" opacity="0.65">robots/anj_turtlebot</text>
+    <text x="330" y="262" opacity="0.65">(bootstrap …) files</text>
+  </g>
+  <g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#arr)">
+    <line x1="170" y1="53"  x2="250" y2="85"/>
+    <line x1="170" y1="133" x2="250" y2="105"/>
+    <line x1="410" y1="96"  x2="490" y2="96"/>
+    <line x1="545" y1="132" x2="537" y2="210"/>
+    <line x1="595" y1="132" x2="642" y2="210"/>
+    <line x1="640" y1="132" x2="752" y2="210"/>
+    <line x1="645" y1="250" x2="645" y2="310"/>
+    <line x1="712" y1="250" x2="668" y2="310"/>
+    <line x1="536" y1="250" x2="620" y2="310" stroke-dasharray="4 4"/>
+    <line x1="490" y1="120" x2="410" y2="220"/>
+  </g>
+  <g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="currentColor" opacity="0.8">
+    <text x="176" y="48">send_message</text>
+    <text x="176" y="128">(command …)</text>
+    <text x="414" y="88">#robots topic</text>
+    <text x="455" y="180">lazily spawns · Popen</text>
+    <text x="600" y="285">apply_turn / apply_move</text>
+    <text x="500" y="296" text-anchor="end">reads pose</text>
+    <text x="400" y="175" text-anchor="end">registers itself</text>
+  </g>
+</svg>
+<figcaption>Chat messages flow left to right; nothing on the right exists until it is
+needed. The robot's hyperspace entries are <em>bootstrap definitions</em>, not running
+actors — the embedded LifeCycleManager Popens each element on first use, discovers it via
+the Registrar, then proxies to it. Dashed = read-only or storage paths.</figcaption>
+</figure>
+
+<h2>What each phase delivered</h2>
+<table>
+<thead><tr><th>Phase</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>Virtual robot driven from chat over <code>aiko.hashtag.ai</code> (registrar, chat server, bot, robot — current S-expression wire protocol).</td></tr>
+<tr><td>1</td><td><code>&lt;Chat&gt;</code>, <code>&lt;Robot&gt;</code>, <code>&lt;Move&gt;</code>, <code>&lt;Telemetry&gt;</code>, <code>&lt;Perceive&gt;</code> interfaces per the design doc; robot = hyperspace collection of Camera source + Turn/Forward targets + VirtualWorld, lazily started from <code>(bootstrap …)</code> dependency files.</td></tr>
+<tr><td>2</td><td>Robot self-registers in the HyperSpace <code>robots/</code> collection: ServiceFilter (with <code>interfaces=</code> tag), LifeCycleManager URL, storage URL — write-through to disk, reloaded on restart.</td></tr>
+<tr><td>3</td><td>ChatSpace CRUD from the REPL (<code>:space_list</code> <code>:space_create</code> <code>:space_add</code> <code>:space_remove</code>, live <code>:lc</code>); members must implement <code>&lt;Chat&gt;</code> — checked against live Registrar tags, rejections explain why.</td></tr>
+<tr><td>4</td><td>ChatAgent (OpenAI API, claude-CLI fallback) discovers robots + capabilities from tags and turns "draw a triangle" into ordered <code>move</code>/<code>turn</code>/<code>look</code> chat commands.</td></tr>
+</tbody>
+</table>
+
+<h2>Try it</h2>
+<pre class="cmd"><span class="c"># stack is running; each block in its own terminal</span>
+cd ~/src/aiko/imagineering-2026-08-22 && source env.sh
+
+./world_viewer.py            <span class="c"># live ASCII map of the robot + trail</span>
+aiko_chat repl               <span class="c"># then :cc robots, and type:</span>
+
+@@anj_turtlebot move 100
+@@anj_turtlebot look
+@@anj_agent drive the turtle in a circle, roughly
+:space_list /
+:space_add robots anj_turtle_world   <span class="c"># watch it get rejected</span></pre>
+
+<h2>Findings worth keeping</h2>
+<ul>
+<li><b>Cross-element command ordering is not guaranteed on cold start.</b> Each lazily
+started element drains its own pending queue when it connects, so move/turn sequences can
+interleave (the amber square above). Fix: serialize robot-side with completion acks.</li>
+<li><b>Dependency storage files can carry bootstrap info.</b> The framework leaves "what
+is stored in each Dependency file?" open; a <code>(bootstrap name protocol command)</code>
+S-expression was enough to drive lazy loading end-to-end.</li>
+<li><b>Robots should only execute messages that <em>start</em> with their mention.</b>
+Once the ChatAgent began chatting <em>about</em> robots, mention-anywhere triggered
+accidental commands.</li>
+<li><b>Two framework bugs fixed</b> in <code>hyperspace.py</code>: <code>remove()</code>
+called <code>_destroy()</code> with a phantom argument; <code>update()</code> subscripted
+a Category instead of <code>.share</code>.</li>
+</ul>
+</main>
+
+<script>
+(function () {
+  var canvas = document.getElementById("replay");
+  var ctx = canvas.getContext("2d");
+  // Real recorded VirtualWorld poses (x, y); world y-up.
+  var square = [[0,0],[100,0],[200,0],[100,0],[100,-100]];
+  var triangle = [[0,-100],[120,-100],[60,3.9],[0,-100]];
+  var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var raf = null;
+
+  function colors() {
+    var style = getComputedStyle(document.documentElement);
+    return {
+      amber: style.getPropertyValue("--amber").trim() || "#a8690f",
+      green: style.getPropertyValue("--accent").trim() || "#0b7a4b",
+      line: style.getPropertyValue("--line").trim() || "#d8ded9",
+      muted: style.getPropertyValue("--muted").trim() || "#5c6b62"
+    };
+  }
+  function toCanvas(point) {           // world (-40..240, -140..60) -> canvas
+    return [40 + (point[0] + 40) * 1.07, 340 - (point[1] + 140) * 1.07];
+  }
+  function grid(c) {
+    ctx.clearRect(0, 0, 380, 380);
+    ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+    for (var g = -40; g <= 240; g += 50) {
+      var p1 = toCanvas([g, -140]), p2 = toCanvas([g, 60]);
+      ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke();
+    }
+    for (var h = -140; h <= 60; h += 50) {
+      var q1 = toCanvas([-40, h]), q2 = toCanvas([240, h]);
+      ctx.beginPath(); ctx.moveTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.stroke();
+    }
+    var origin = toCanvas([0, 0]);
+    ctx.fillStyle = c.muted;
+    ctx.beginPath(); ctx.arc(origin[0], origin[1], 3, 0, 7); ctx.fill();
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    ctx.fillText("0,0", origin[0] + 6, origin[1] - 5);
+  }
+  function drawPath(points, color, fraction) {
+    var total = 0, lengths = [];
+    for (var i = 1; i < points.length; i++) {
+      var a = toCanvas(points[i-1]), b = toCanvas(points[i]);
+      var length = Math.hypot(b[0]-a[0], b[1]-a[1]);
+      lengths.push(length); total += length;
+    }
+    var budget = total * fraction, tip = toCanvas(points[0]);
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(tip[0], tip[1]);
+    for (var j = 1; j < points.length && budget > 0; j++) {
+      var start = toCanvas(points[j-1]), end = toCanvas(points[j]);
+      var segment = lengths[j-1], part = Math.min(1, budget / segment);
+      tip = [start[0] + (end[0]-start[0]) * part, start[1] + (end[1]-start[1]) * part];
+      ctx.lineTo(tip[0], tip[1]); budget -= segment;
+    }
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(tip[0], tip[1], 4.5, 0, 7); ctx.fill();
+  }
+  function render(fraction) {
+    var c = colors();
+    grid(c);
+    drawPath(square, c.amber, Math.min(1, fraction * 2));
+    if (fraction > 0.5) drawPath(triangle, c.green, (fraction - 0.5) * 2);
+  }
+  function play() {
+    if (raf) cancelAnimationFrame(raf);
+    if (reduced) { render(1); return; }
+    var start = performance.now(), duration = 5000;
+    (function step(now) {
+      var fraction = Math.min(1, (now - start) / duration);
+      render(fraction);
+      if (fraction < 1) raf = requestAnimationFrame(step);
+    })(start);
+  }
+  document.getElementById("play").addEventListener("click", play);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { render(1); });
+  play();
+})();
+</script>
