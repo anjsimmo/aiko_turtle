@@ -89,7 +89,7 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Telemetry):
 
     # ----------------------------------------------------------------- #
     # Phase 2: add this robot to the "robots" collection of the running
-    # HyperSpace (named after the local hostname, see "aiko_hyperspace run").
+    # HyperSpace (any one found via the Registrar, e.g on aiko.hashtag.ai).
     # The entry is a Dependency: WHAT to discover (ServiceFilter including
     # the implemented interfaces), WHO manages its lifecycle (our
     # ProcessManager) and WHERE its definition is stored (the robot space)
@@ -108,8 +108,10 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Telemetry):
             hyperspace.add(f"robots/{self.robot_name}",
                 service_filter, lifecycle_manager_url, storage_url)
 
+        # name="*": join whichever HyperSpace is running (e.g the shared one
+        # on aiko.hashtag.ai), not only one named after the local hostname
         aiko.do_command(HyperSpaceImpl,
-            aiko.ServiceFilter(name=None, protocol=HYPERSPACE_PROTOCOL),
+            aiko.ServiceFilter(name="*", protocol=HYPERSPACE_PROTOCOL),
             join)
 
     # ----------------------------------------------------------------- #

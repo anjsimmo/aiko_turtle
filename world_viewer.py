@@ -34,7 +34,7 @@ class WorldViewer(aiko.Actor):
         if getattr(self, "ec_consumer", None):
             self.ec_consumer.terminate()
         self.ec_consumer = aiko.ECConsumer(
-            self, 0, {}, f"{service_details[0]}/control", "(pose)")
+            self, 0, {}, f"{service_details[0]}/control", ["pose"])
         self.ec_consumer.add_handler(self._pose_handler)
 
     def _remove_handler(self, service_details):

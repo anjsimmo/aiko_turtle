@@ -79,7 +79,7 @@ class CameraSource(_WorldClient, Perceive):
         _WorldClient._world_add_handler(self, service_details, service)
         self.world_topic_path = service_details[0]
         self.ec_consumer = aiko.ECConsumer(
-            self, 0, {}, f"{self.world_topic_path}/control", "(pose)")
+            self, 0, {}, f"{self.world_topic_path}/control", ["pose"])
         self.ec_consumer.add_handler(self._pose_change_handler)
 
     def _pose_change_handler(self, client_id, command, item_name, item_value):

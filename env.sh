@@ -10,3 +10,5 @@ export AIKO_MQTT_PORT=1883
 export AIKO_NAMESPACE=aiko
 export AIKO_LOG_LEVEL=INFO
 export USER="${USER:-anj}"
+# Unbuffered stdout so "script > log &" streams live
+export PYTHONUNBUFFERED=1
