@@ -72,13 +72,14 @@ button:hover { opacity:0.88; }
 button:focus-visible, input:focus-visible { outline:2px solid var(--muted); outline-offset:2px; }
 #messages { list-style:none; margin:0; padding:0; height:min(60vh,520px); overflow-y:auto;
             border:1px solid var(--line); border-radius:4px; font-size:0.82rem; }
-#messages li { padding:6px 10px; border-bottom:1px solid var(--line); word-break:break-word; }
+#messages li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:0 8px;
+               padding:6px 10px; border-bottom:1px solid var(--line); word-break:break-word; }
 #messages li:last-child { border-bottom:none; }
-#messages .who { color:var(--muted); margin-right:8px; }
+#messages .who { color:var(--muted); }
 #messages .bot .who { color:var(--bot); }
 #messages .me { background:var(--me); }
 #messages .me .who { color:var(--accent); }
-#messages .time { float:right; color:var(--muted); font-size:0.7rem; }
+#messages .time { color:var(--muted); font-size:0.7rem; white-space:nowrap; }
 #empty { color:var(--muted); font-size:0.8rem; padding:10px; }
 #chips { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0; }
 #chips button { background:var(--surface); color:var(--ink); border:1px solid var(--line); }
@@ -226,7 +227,7 @@ function addMessage(m) {
   t.textContent = new Date(m.timestamp * 1000).toLocaleTimeString();
   var w = document.createElement("span"); w.className = "who"; w.textContent = who + ":";
   var x = document.createElement("span"); x.textContent = text;
-  li.append(t, w, x);
+  li.append(w, x, t);
   messages.append(li);
   while (messages.children.length > 300) messages.firstChild.remove();
   messages.scrollTop = messages.scrollHeight;
