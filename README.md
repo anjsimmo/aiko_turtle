@@ -7,10 +7,12 @@ A virtual **ChatRobotAgent** ("Angie's TurtleBot" pattern) built on
 The demo shows the **robot and the chat side by side** in a browser page:
 drive the robot from the chat and watch it move.
 
-What was built (all four phases work end-to-end):
+It runs against the **official, unmodified** `aiko_services` (master) and
+`aiko_chat` (main). Everything here is application code in this directory.
 
-- **Phase 0** — virtual robot connects to Aiko Chat (notebook pattern, updated
-  to the current S-expression wire protocol).
+What was built:
+
+- **Phase 0** — virtual robot connects to Aiko Chat.
 - **Phase 1** — `<Chat>` + `<Robot>` (`<Move>`, `<Telemetry>`, `<Perceive>`)
   Interfaces per the design doc (`interfaces.py`). The robot is a hyperspace
   collection of **sources and targets** (Camera source, Turn/Forward targets
@@ -21,22 +23,25 @@ What was built (all four phases work end-to-end):
 - **Phase 2** — on startup the robot **adds itself** to the running
   HyperSpace's `robots/` collection (ServiceFilter incl. an `interfaces=` tag,
   LifeCycleManager URL, storage URL).
-- **Phase 3** — **ChatSpace** CRUD from the Chat REPL. New `chat_space.py` in
-  aiko_chat: a HyperSpace whose channel members **MUST implement `<Chat>`**
-  (enforced against the live Registrar tags). New REPL commands + a live
-  channel list. *Needs the aiko_chat working-tree changes on the ChatServer
-  side, see "Repo changes" below.*
 - **Phase 4** — **LLM ChatAgent** (`@@anj_agent`, OpenAI with a `claude -p`
   fallback) discovers robots + capabilities from Registrar tags and drives
   them through chat (e.g. "draw a square" → four `move`/`turn` commands + a
   `look`).
+- **Phase 3** (ChatSpace: channel members must implement `<Chat>`) was
+  prototyped as a change *inside* aiko_chat and is **not part of this repo**
+  (it required a modified ChatServer). See "Design notes" below for the
+  framework-conformant way to do it.
 
-## Topology (since 2026-11-08)
+## Topology
 
-The shared services run on **aiko.hashtag.ai** and are *not* started here:
-Registrar, HyperSpace and ChatServer (plus the MQTT broker). Everything in
-this directory connects to them via `AIKO_MQTT_HOST=aiko.hashtag.ai` and
-namespace `aiko` (see `env.sh`).
+The shared services run on **aiko.hashtag.ai** (MQTT broker, Registrar,
+HyperSpace, ChatServer) and are not started here. Everything in this
+directory connects to them. To use another deployment, set the usual Aiko
+variables *before* sourcing `env.sh` — it only fills in defaults:
+
+```bash
+AIKO_MQTT_HOST=localhost AIKO_NAMESPACE=aiko ./start.sh
+```
 
 Locally you run only the robot side:
 
@@ -48,17 +53,27 @@ Locally you run only the robot side:
 
 ## Prerequisites
 
-- conda env `aiko` (Python 3.13) with `aiko_services` and `aiko_chat`
-  installed editable from `/home/anj/src/aiko/{aiko_services,aiko_chat}`.
-- `source env.sh` sets `PATH` (aiko env), `AIKO_MQTT_HOST=aiko.hashtag.ai`,
-  `AIKO_NAMESPACE=aiko`, `PYTHONUNBUFFERED=1`.
-- LLM ChatAgent: `OPENAI_API_KEY` (env or `/home/anj/src/aiko/open-ai-key.txt`),
-  otherwise it shells out to the `claude` CLI (`claude -p --model haiku`).
+- Python 3.12+ with the two official packages installed, for example:
+
+  ```bash
+  git clone https://github.com/geekscape/aiko_services && pip install -e aiko_services
+  git clone https://github.com/geekscape/aiko_chat     && pip install -e aiko_chat
+  ```
+
+  (`pip install -e` is what the Aiko ReadMe uses; a venv or conda env is fine.)
+- `env.sh` prepends `$AIKO_PYTHON_BIN` (default: the `aiko` conda env's `bin`)
+  to `PATH` if that directory exists; otherwise activate your own env first.
+- A Registrar + ChatServer reachable at `$AIKO_MQTT_HOST` (default
+  `aiko.hashtag.ai`, namespace `aiko`).
+- LLM ChatAgent: `OPENAI_API_KEY` in the environment (or the fallback file
+  `/home/anj/src/aiko/open-ai-key.txt`); without a key it shells out to the
+  `claude` CLI (`claude -p --model haiku`).
+- Optional: `mosquitto_sub` for watching raw MQTT traffic.
 
 ## Run it
 
 ```bash
-cd /home/anj/src/aiko/imagineering-2026-08-22
+cd imagineering-2026-08-22
 ./start.sh      # robot, LLM agent, web page (logs in logs/)
 ./stop.sh       # stops them and the robot's elements
 ```
@@ -102,24 +117,12 @@ with `aiko_chat send robots "..."`):
 Other views: `./world_viewer.py` (ASCII map in a terminal) and
 `aiko_dashboard` (with `env.sh` sourced).
 
-ChatSpace CRUD from the REPL (replies come from `@@chat_space`) — only
-works against a ChatServer running the aiko_chat working-tree changes:
-
-```text
-:lc                               ;; live channel list (from shared state)
-:space_list /                     ;; :sl  render the whole ChatSpace
-:space_create myrobots            ;; :sc  new channel Category
-:space_add myrobots anj_turtlebot ;; :sa  OK - implements <Chat>
-:space_add myrobots anj_turtle_world  ;; REJECTED - no <Chat> interface
-:space_remove channels/myrobots/anj_turtlebot   ;; :sr
-```
-
 ## Files
 
 | File | Purpose |
 |---|---|
 | `start.sh`, `stop.sh` | start/stop the local processes (logs in `logs/`) |
-| `env.sh` | environment (aiko conda env PATH, MQTT host, namespace) |
+| `env.sh` | environment defaults (PATH, MQTT host/port, namespace); preset values win |
 | `interfaces.py` | `<Chat>` `<Robot>` `<Move>` `<Telemetry>` `<Perceive>` + `interfaces=` tag helpers |
 | `virtual_world.py` | VirtualWorld actor: the virtual "hardware" (pose) |
 | `robot_elements.py` | Camera **source**, Turn/Forward **targets** (pipeline Target concept) |
@@ -128,31 +131,35 @@ works against a ChatServer running the aiko_chat working-tree changes:
 | `chat_llm_agent.py` | Phase 4 LLM ChatAgent (robot discovery via tags, OpenAI / `claude -p`) |
 | `world_viewer_web.py` | robot + chat side by side in the browser (http://localhost:8123) |
 | `world_viewer.py` | live ASCII visual of the world in a terminal |
-| `test_chat_space.py` | Phase 3 CRUD/enforcement exercise script |
 | `virtual_robot.py`, `robot_chatbot.py` | Phase 0 (superseded by chat_robot_agent) |
 | `report.html` | the 2026-08-22 session report |
 | `_robot_space_/` | (generated, ignored) the robot's hyperspace definition |
-| `_world_space_/`, `_chat_server_/` | (legacy, ignored) storage from when HyperSpace and ChatServer ran locally |
 
-## Repo changes (working trees, not committed)
+## Design notes
 
-- `aiko_chat`: new `src/aiko_chat/chat_space.py`; ChatSpace + `space_*`
-  methods in `chat_server.py`; REPL commands + live `:lc` in `chat_repl.py`.
-  The ChatServer on aiko.hashtag.ai runs aiko_chat `main` without these, so
-  the `:space_*` commands and `:lc` are inert against it. `chat_space.py`
-  is still imported locally (`implements()` helper) by the LLM ChatAgent.
-- `aiko_services`: the August fixes (`hyperspace.py` `remove()`/`update()`,
-  `share.py` `ECProducer._update_consumers()` using `generate()`) are now
-  in `master`.
+- **Advertising Interfaces.** The robot advertises what it implements as one
+  tag, `interfaces=Chat,Robot,Move,Telemetry`, parsed by `implements()` in
+  `interfaces.py`. The Registrar matches tags by exact `key=value`, so that
+  tag cannot be used in a `ServiceFilter`. The Aiko Services convention
+  (ADR-025, s_00 §1.3) is one tag per aspect derived from its protocol id,
+  e.g. `chat=0 robot=0 move=0`, which a ServiceFilter *can* select on.
+  Switching to that is the natural next step.
+- **Channel membership (the Phase 3 idea).** With per-aspect tags, "who is in
+  #robots and can chat" is simply the discovery query
+  `tags=["chat=0", "channel=robots"]` (the robot already advertises
+  `channel=robots`) — no stored member list and no server-side gate needed.
+  If a stored ChatSpace is wanted anyway, put the condition in each entry's
+  Dependency ServiceFilter instead of subclassing `HyperSpaceImpl`
+  (constitution P5/P7; HyperSpace write validation belongs to the
+  `storage_mutation` gate of s_05 once that exists).
 
 ## Findings / known issues
 
-- **ECConsumer filters must be lists.** Since `share.py` serialises the
-  share request with `generate()`, a filter passed as the string `"(pose)"`
-  arrives as a quoted string and matches nothing (no sync, no updates; the
-  camera reported `(unknown)`). Pass `["pose"]`. Fixed in the viewers and
-  the Camera source on 2026-11-08.
-- **Channel `robots` is not in the remote ChatServer's channel list**
+- **ECConsumer filters must be lists.** `share.py` serialises the share
+  request with `generate()`, so a filter passed as the string `"(pose)"`
+  arrives as a quoted string and matches nothing (no sync, no updates).
+  Pass `["pose"]`.
+- **Channel `robots` is not in the ChatServer's channel list**
   (general, llm, random, robot, yolo). The server republishes to any
   channel topic, so it works, but `:lc` won't show it. Avoid `robot`: the
   server treats that recipient specially (XGO robot routing).

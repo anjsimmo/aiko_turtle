@@ -17,7 +17,7 @@ fi
 
 __start() {                             # __start NAME COMMAND...
   local name=$1; shift
-  if pgrep -f "^python3 ./$2" > /dev/null; then
+  if pgrep -f "^python3 $1" > /dev/null; then
     echo "$name: already running"
   else
     (setsid nohup "$@" > "logs/$name.log" 2>&1 &)

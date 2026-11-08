@@ -32,7 +32,7 @@ import click
 import aiko_services as aiko
 from aiko_services.main.share import services_cache_create_singleton
 import aiko_chat.bot as bot
-from aiko_chat.chat_space import implements
+from interfaces import implements
 from aiko_chat.protocol import _decode_message
 
 _BOTNAME = "@@anj_agent"
