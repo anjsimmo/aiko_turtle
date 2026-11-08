@@ -128,18 +128,20 @@ def interface_names(instance_or_class):
     for klass in cls.__mro__:
         if klass.__name__ in _PLUMBING:
             continue
+        if klass.__module__ != __name__:      # only the Interfaces here
+            continue
         if _is_interface(klass) and klass.__name__ not in names:
             names.append(klass.__name__)
     return names
 
 
-def interfaces_tag(instance_or_class):
-    return f"interfaces={','.join(interface_names(instance_or_class))}"
+def aspect_tags(instance_or_class, version=0):
+    """One tag per implemented Interface: ["chat=0", "robot=0", ...]"""
+    return [f"{name.lower()}={version}"
+            for name in interface_names(instance_or_class)]
 
 
 def implements(tags, interface_name):
-    # tags: list like ["ec=true", "interfaces=Chat,Robot,Move"]
-    for tag in tags or []:
-        if tag.startswith("interfaces="):
-            return interface_name in tag.split("=", 1)[1].split(",")
-    return False
+    """True if the Service tags advertise <interface_name> (any version)"""
+    prefix = f"{interface_name.lower()}="
+    return any(str(tag).startswith(prefix) for tag in tags or [])

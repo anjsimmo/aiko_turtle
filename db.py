@@ -1,0 +1,103 @@
+# Persistent state of the world: robots (current pose) and events (history).
+#
+# One table of robots and one append-only table of events, through
+# SQLAlchemy Core so the database is whatever TURTLE_DATABASE_URL says:
+# SQLite by default, PostgreSQL or MySQL with no code change.
+
+import time
+
+from sqlalchemy import (
+    Column, Float, Integer, MetaData, String, Table, create_engine, delete,
+    insert, select, update,
+)
+from sqlalchemy.pool import StaticPool
+
+metadata = MetaData()
+
+robots = Table("robots", metadata,
+    Column("name", String(64), primary_key=True),
+    Column("kind", String(32), nullable=False, default="turtle"),
+    Column("owner", String(64), nullable=False, default="anonymous"),
+    Column("host", String(32), nullable=False, default="external"),
+    Column("x", Float, nullable=False, default=0.0),
+    Column("y", Float, nullable=False, default=0.0),
+    Column("heading", Float, nullable=False, default=0.0),
+    Column("created_at", Float, nullable=False),
+    Column("updated_at", Float, nullable=False),
+)
+
+events = Table("events", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("timestamp", Float, nullable=False),
+    Column("robot", String(64), nullable=False, index=True),
+    Column("username", String(64), nullable=False, default="anonymous"),
+    Column("command", String(32), nullable=False),
+    Column("argument", String(64), nullable=False, default=""),
+    Column("x", Float, nullable=False),
+    Column("y", Float, nullable=False),
+    Column("heading", Float, nullable=False),
+)
+
+
+class Database:
+    def __init__(self, url):
+        kwargs = {}
+        if url.startswith("sqlite"):
+            # one connection shared across threads, so "sqlite://" (memory)
+            # behaves and a file database needs no pool tuning
+            kwargs = {"connect_args": {"check_same_thread": False},
+                      "poolclass": StaticPool}
+        self.engine = create_engine(url, **kwargs)
+        metadata.create_all(self.engine)
+
+    # -- robots ------------------------------------------------------------
+
+    def list_robots(self):
+        with self.engine.begin() as connection:
+            rows = connection.execute(
+                select(robots).order_by(robots.c.created_at)).mappings()
+            return [dict(row) for row in rows]
+
+    def get_robot(self, name):
+        with self.engine.begin() as connection:
+            row = connection.execute(
+                select(robots).where(robots.c.name == name)).mappings().first()
+            return dict(row) if row else None
+
+    def save_robot(self, record):
+        now = time.time()
+        with self.engine.begin() as connection:
+            exists = connection.execute(
+                select(robots.c.name).where(robots.c.name == record["name"])
+            ).first()
+            values = {key: record[key]
+                      for key in ("kind", "owner", "host", "x", "y", "heading")}
+            values["updated_at"] = now
+            if exists:
+                connection.execute(update(robots)
+                    .where(robots.c.name == record["name"]).values(**values))
+            else:
+                connection.execute(insert(robots).values(
+                    name=record["name"], created_at=now, **values))
+
+    def delete_robot(self, name):
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                delete(robots).where(robots.c.name == name))
+            return result.rowcount > 0
+
+    # -- events --------------------------------------------------------------
+
+    def add_event(self, robot, username, command, argument, x, y, heading):
+        with self.engine.begin() as connection:
+            connection.execute(insert(events).values(
+                timestamp=time.time(), robot=robot, username=username,
+                command=command, argument=str(argument),
+                x=x, y=y, heading=heading))
+
+    def list_events(self, robot, limit=100):
+        with self.engine.begin() as connection:
+            rows = connection.execute(select(events)
+                .where(events.c.robot == robot)
+                .order_by(events.c.id.desc()).limit(limit)).mappings()
+            return [dict(row) for row in rows][::-1]     # oldest first

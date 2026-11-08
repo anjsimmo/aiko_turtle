@@ -1,0 +1,9 @@
+# plus the two official Aiko packages, installed editable from their repos:
+#   pip install -e ../aiko_services -e ../aiko_chat
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+python-dotenv>=1.0
+openai>=1.0          # optional: the LLM ChatAgent falls back to the claude CLI
+pytest>=8            # tests
+httpx>=0.27          # tests (FastAPI TestClient)

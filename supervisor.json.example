@@ -1,0 +1,17 @@
+[
+  {"enabled": true,
+   "command": "python3 virtual_world.py run",
+   "cwd":     "/path/to/aiko_turtle"},
+
+  {"enabled": true,
+   "command": "python3 web.py",
+   "cwd":     "/path/to/aiko_turtle"},
+
+  {"enabled": true,
+   "command": "python3 agent.py run",
+   "cwd":     "/path/to/aiko_turtle"},
+
+  {"enabled": false,
+   "command": "python3 robot.py run --name demo_turtle",
+   "cwd":     "/path/to/aiko_turtle"}
+]

@@ -1,182 +1,228 @@
 # aiko_turtle
 
-A virtual TurtleBot you drive from Aiko Chat, with the robot and the chat
-side by side in a browser. Built during the 2026-08-22 Aiko imagineering
-session.
+Virtual robots in a shared world, for AI + ML + robotics experiments.
+Anyone can create a robot, drive it from the chat, from a REST API or
+from an LLM agent, and watch every robot move in the browser.
 
-It is a **ChatRobotAgent** ("Angie's TurtleBot" pattern) built on
+Built on the official, unmodified
 [aiko_services](https://github.com/geekscape/aiko_services) and
-[aiko_chat](https://github.com/geekscape/aiko_chat), following the
-2026-08-15 Aiko Services Design doc and the 2026-08-22 imagineering plan.
-Drive the robot from the chat and watch it move.
+[aiko_chat](https://github.com/geekscape/aiko_chat). Everything here is
+application code; the shared services (MQTT broker, Registrar, HyperSpace,
+ChatServer) run on the community instance **aiko.hashtag.ai**.
 
-It runs against the **official, unmodified** `aiko_services` (master) and
-`aiko_chat` (main). Everything here is application code in this directory.
+**Last tested with** aiko_services `39796ee` (2026-11-07) and aiko_chat
+`9edb211` (2026-10-31), the heads of `master` and `main` at the time. The
+aim is that it always works with the latest; if it does not, those are the
+commits to compare against.
 
-What was built:
+## How it fits together
 
-- **Phase 0** — virtual robot connects to Aiko Chat.
-- **Phase 1** — `<Chat>` + `<Robot>` (`<Move>`, `<Telemetry>`, `<Perceive>`)
-  Interfaces per the design doc (`interfaces.py`). The robot is a hyperspace
-  collection of **sources and targets** (Camera source, Turn/Forward targets
-  + a VirtualWorld "hardware" actor). Hyperspace entries are *not* running
-  Actors — each Dependency storage file holds a `(bootstrap ...)` S-expression
-  (service name, protocol, command line) and the robot's embedded
-  ProcessManager **lazily starts** each element the first time it is needed.
-- **Phase 2** — on startup the robot **adds itself** to the running
-  HyperSpace's `robots/` collection (ServiceFilter incl. an `interfaces=` tag,
-  LifeCycleManager URL, storage URL).
-- **Phase 4** — **LLM ChatAgent** (`@@anj_agent`, OpenAI with a `claude -p`
-  fallback) discovers robots + capabilities from Registrar tags and drives
-  them through chat (e.g. "draw a square" → four `move`/`turn` commands + a
-  `look`).
-- **Phase 3** (ChatSpace: channel members must implement `<Chat>`) was
-  prototyped as a change *inside* aiko_chat and is **not part of this repo**
-  (it required a modified ChatServer). See "Design notes" below for the
-  framework-conformant way to do it.
-
-## Topology
-
-The shared services run on **aiko.hashtag.ai** (MQTT broker, Registrar,
-HyperSpace, ChatServer) and are not started here. Everything in this
-directory connects to them. To use another deployment, set the usual Aiko
-variables *before* sourcing `env.sh` — it only fills in defaults:
-
-```bash
-AIKO_MQTT_HOST=localhost AIKO_NAMESPACE=aiko ./start.sh
-```
-
-Locally you run only the robot side:
-
-| Process | What |
+| Process | What it is |
 |---|---|
-| `chat_robot_agent.py` | the ChatRobotAgent `@@anj_turtlebot` (+ its lazily started elements) |
-| `chat_llm_agent.py` | the LLM ChatAgent `@@anj_agent` |
-| `world_viewer_web.py` | the robot + chat page at http://localhost:8123 |
+| `virtual_world.py` | **VirtualWorld** Actor: holds every robot's pose, persists them in a database, publishes them as the share `robots.<name>` |
+| `robot.py` | **ChatRobotAgent**: one Actor per robot, implementing the `<Chat>` and `<Robot>` (`<Move>` `<Perceive>` `<Telemetry>`) Interfaces. Its body is in the world; it is the robot's voice in the chat and its entry in the Registrar |
+| `web.py` | **web server** (FastAPI): the page, the REST API (`/docs`) and a live SSE stream. It also *hosts* a ChatRobotAgent for every robot created over REST, so those answer in the chat too |
+| `agent.py` | **LLM ChatAgent** `@@pilot`: discovers robots from Registrar tags and drives them in natural language. Rate limited |
 
-## Prerequisites
+Every robot in the world is always answerable in the chat and listed in
+the Registrar:
 
-- Python 3.12+ with the two official packages installed, for example:
+- **Over REST / the page**: `POST /api/robots`. The web server hosts the
+  robot's chat Actor, and re-hosts every robot after a restart.
+- **Over Aiko, from any machine**: `./robot.py run --name NAME`. While
+  your process runs, *it* speaks for the robot and the web server steps
+  back; when it exits, the web server takes over again. So your own code
+  (or a physical robot) can stand in for a virtual one at any time.
 
-  ```bash
-  git clone https://github.com/anjsimmo/aiko_turtle
-  git clone https://github.com/geekscape/aiko_services && pip install -e aiko_services
-  git clone https://github.com/geekscape/aiko_chat     && pip install -e aiko_chat
-  ```
+Both are the same thing: a row in the world's database and a
+`<Chat>`+`<Robot>` Service in the Registrar.
 
-  (`pip install -e` is what the Aiko ReadMe uses; a venv or conda env is fine.)
-- `env.sh` prepends `$AIKO_PYTHON_BIN` (default: the `aiko` conda env's `bin`)
-  to `PATH` if that directory exists; otherwise activate your own env first.
-- A Registrar + ChatServer reachable at `$AIKO_MQTT_HOST` (default
-  `aiko.hashtag.ai`, namespace `aiko`).
-- LLM ChatAgent: `OPENAI_API_KEY` in the environment (or the fallback file
-  `/home/anj/src/aiko/open-ai-key.txt`); without a key it shells out to the
-  `claude` CLI (`claude -p --model haiku`).
-- Optional: `mosquitto_sub` for watching raw MQTT traffic.
+Identity is deliberately not validated: pick any user name and any robot
+name. If you do not want others driving your robot, pick a longer, more
+unusual name.
 
-## Run it
+## Install
 
 ```bash
-cd aiko_turtle
-./start.sh      # robot, LLM agent, web page (logs in logs/)
-./stop.sh       # stops them and the robot's elements
+git clone https://github.com/geekscape/aiko_services && pip install -e aiko_services
+git clone https://github.com/geekscape/aiko_chat     && pip install -e aiko_chat
+git clone https://github.com/anjsimmo/aiko_turtle    && cd aiko_turtle
+pip install -r requirements.txt
+cp .env.example .env          # optional: edit what you need
 ```
 
-`start.sh` runs `./robot_space_setup.py` once if `_robot_space_/` is missing
-(it writes the robot's bootstrap entries; the directory is not versioned
-because it holds absolute paths and symlinks).
+Python 3.12+. A venv or conda env is fine; `env.sh` warns if the `python3`
+it finds lacks the packages. Set `AIKO_PYTHON_BIN` in `.env` to the `bin`
+of your environment if you do not want to activate it each time.
 
-By hand, each in its own terminal:
+## Configure
+
+Everything is a variable with a default, read from the environment, then
+`.env` (not committed), then `config.py`. See `.env.example`. The ones
+you are most likely to touch:
+
+| Variable | Default | |
+|---|---|---|
+| `AIKO_MQTT_HOST` | `aiko.hashtag.ai` | the shared services |
+| `TURTLE_WORLD` | `turtle_world` | name of the VirtualWorld Service |
+| `TURTLE_DATABASE_URL` | `sqlite:///turtle.db` | any SQLAlchemy URL; relative to the working directory, like HyperSpace storage |
+| `TURTLE_CHANNEL` | `robots` | chat channel |
+| `TURTLE_WEB_PORT` | `8123` | the web server binds `127.0.0.1` |
+| `OPENAI_API_KEY` | | the agent falls back to the `claude` CLI without it |
+| `TURTLE_LLM_RATE_PER_MINUTE` | `10` | agent requests per minute (also `_USER_` per user, and `_QUEUE_LIMIT`) |
+
+## Run
 
 ```bash
-source env.sh
-./chat_robot_agent.py run          # the robot
-./chat_llm_agent.py run            # the LLM ChatAgent
-./world_viewer_web.py              # http://localhost:8123
+./start.sh      # world, web server, agent (logs in logs/)
+./stop.sh
 ```
 
-## Try it out
+Or by hand, each in its own terminal, after `source env.sh`:
 
-Open **http://localhost:8123**: the live world (canvas, LoliBot sprite,
-trail) is on the left and the `#robots` channel on the right, with a send
-box and quick-command buttons. The page is a chat client like
-`aiko_chat repl` (discovers the ChatServer, subscribes to the channel topic,
-sends with `ChatServer.send_message()`), so it shows everyone's messages,
-including the robot's and the agent's replies. Narrow windows stack the two
-panels.
+```bash
+./virtual_world.py run
+./web.py
+./agent.py run
+./robot.py run --name my_turtle      # a robot of your own, from anywhere
+```
 
-Things to type (in the page, in `aiko_chat repl` after `:cc robots`, or
-with `aiko_chat send robots "..."`):
+## Try it
+
+Open **http://localhost:8123**. The world is on the left: create a robot,
+click one to select it, use the quick-command buttons. The `#robots`
+channel is on the right, with your name in the box (any name).
+
+**REST** (interactive docs at http://localhost:8123/docs):
+
+```bash
+curl -X POST localhost:8123/api/robots -H 'Content-Type: application/json' \
+     -d '{"name": "my_turtle", "kind": "turtle", "owner": "me"}'
+curl -X POST localhost:8123/api/robots/my_turtle/turn -H 'Content-Type: application/json' \
+     -d '{"angle": 90, "username": "me"}'
+curl -X POST localhost:8123/api/robots/my_turtle/move -H 'Content-Type: application/json' \
+     -d '{"distance": 100, "username": "me"}'
+curl localhost:8123/api/robots                 # everyone's robots
+curl localhost:8123/api/robots/my_turtle/history
+curl -N localhost:8123/events                  # live poses + chat (SSE)
+curl -X DELETE localhost:8123/api/robots/my_turtle
+```
+
+Every drive call returns the new pose. Kinds: `turtle`, `arrow`.
+
+**Chat** (the page, `aiko_chat repl` after `:cc robots`, or
+`aiko_chat send robots "..."`):
 
 ```text
-@@anj_turtlebot move 100          ;; <Move> -> lazily starts world + forward
-@@anj_turtlebot turn 90           ;; counter-clockwise degrees
-@@anj_turtlebot look              ;; <Perceive> camera -> reports pose
-@@anj_turtlebot telemetry         ;; <Telemetry>
-@@anj_turtlebot interfaces        ;; <Robot> get_interfaces
-@@anj_turtlebot reset             ;; back to origin (0,0) heading 0
-@@anj_agent draw a triangle with the turtle robot   ;; natural language!
+@@my_turtle move 100         ;; <Move>, replies with the new pose
+@@my_turtle turn 90          ;; degrees counter-clockwise
+@@my_turtle look             ;; <Perceive>
+@@my_turtle telemetry        ;; <Telemetry>
+@@my_turtle interfaces       ;; <Robot>
+@@my_turtle reset
+@@pilot draw a square with my_turtle     ;; the LLM agent
 ```
 
-Other views: `./world_viewer.py` (ASCII map in a terminal) and
-`aiko_dashboard` (with `env.sh` sourced).
+Robots act only on messages that *start* with their `@@name`. Replies end
+with ` !!!!`, the aiko_chat convention that stops bots answering bots.
+
+## Tests
+
+```bash
+python3 -m pytest -q tests      # 13 tests, well under a second, no broker needed
+```
+
+They cover the world maths and persistence, the chat command and LLM
+output parsers, the rate limiter, and the REST API against a fake
+backend.
+
+## State
+
+| What | Where | Owner |
+|---|---|---|
+| robot definitions and poses | `robots` table | the world |
+| every command, who sent it, the resulting pose | `events` table (`/api/robots/NAME/history`) | the world |
+| live poses | the share `robots.<name>` on the world's topic | the world |
+| which robots the web server speaks for | `host` column = `web` | the world, written by the web server |
+
+The world is the only writer. Restart anything and the robots are where
+they were. Change the database with one variable (`TURTLE_DATABASE_URL`).
+
+## 24x7 with the ProcessManager
+
+Follow the aiko_services tutorial
+[production_instance.md](https://github.com/geekscape/aiko_services/blob/master/documentation/tutorials/production_instance.md)
+and add the entries from `supervisor.json.example` to your
+`${HOST}_supervisor.json` (fix the `cwd` paths). The `.env` is read by
+`config.py` in every process, so the definition file needs no variables;
+the only thing the `systemd` unit must provide is a `PATH` that finds the
+right `python3`, for example with `Environment=PATH=/path/to/venv/bin:...`.
+
+## Behind nginx with HTTPS
+
+The web server binds localhost. A reverse proxy needs streaming for the
+SSE endpoint; `certbot --nginx` adds the certificate:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8123;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_buffering off;          # /events is server-sent events
+    proxy_read_timeout 1h;
+}
+```
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `start.sh`, `stop.sh` | start/stop the local processes (logs in `logs/`) |
-| `env.sh` | environment defaults (PATH, MQTT host/port, namespace); preset values win |
-| `interfaces.py` | `<Chat>` `<Robot>` `<Move>` `<Telemetry>` `<Perceive>` + `interfaces=` tag helpers |
-| `virtual_world.py` | VirtualWorld actor: the virtual "hardware" (pose) |
-| `robot_elements.py` | Camera **source**, Turn/Forward **targets** (pipeline Target concept) |
-| `robot_space_setup.py` | writes the robot's hyperspace bootstrap entries |
-| `chat_robot_agent.py` | the ChatRobotAgent: `<Chat>`+`<Robot>`, lazy LifeCycleManager, hyperspace self-registration |
-| `chat_llm_agent.py` | Phase 4 LLM ChatAgent (robot discovery via tags, OpenAI / `claude -p`) |
-| `world_viewer_web.py` | robot + chat side by side in the browser (http://localhost:8123) |
-| `world_viewer.py` | live ASCII visual of the world in a terminal |
-| `virtual_robot.py`, `robot_chatbot.py` | Phase 0 (superseded by chat_robot_agent) |
-| `report.html` | the 2026-08-22 session report |
-| `_robot_space_/` | (generated, ignored) the robot's hyperspace definition |
+| `config.py` | settings: environment, then `.env`, then defaults |
+| `db.py` | the `robots` and `events` tables (SQLAlchemy Core) |
+| `world_model.py` | the world without Aiko: poses, maths, persistence |
+| `virtual_world.py` | the VirtualWorld Actor |
+| `interfaces.py` | `<Chat>` `<Robot>` `<Move>` `<Perceive>` `<Telemetry>` and the aspect tags |
+| `core.py` | chat command parser, LLM output parser, rate limiter, name rule |
+| `robot.py` | ChatRobotAgent (`./robot.py run`, and `host_robot()` for the web server) |
+| `agent.py` | the LLM ChatAgent |
+| `webapp.py` | the FastAPI app and page (no Aiko; testable) |
+| `web.py` | the Aiko-connected backend and server |
+| `tests/` | pytest |
+| `start.sh` `stop.sh` `env.sh` | local convenience |
+| `supervisor.json.example` | ProcessManager definition entries |
+| `docs/` | the 2026-08-22 imagineering session report |
 
 ## Design notes
 
-- **Advertising Interfaces.** The robot advertises what it implements as one
-  tag, `interfaces=Chat,Robot,Move,Telemetry`, parsed by `implements()` in
-  `interfaces.py`. The Registrar matches tags by exact `key=value`, so that
-  tag cannot be used in a `ServiceFilter`. The Aiko Services convention
-  (ADR-025, s_00 §1.3) is one tag per aspect derived from its protocol id,
-  e.g. `chat=0 robot=0 move=0`, which a ServiceFilter *can* select on.
-  Switching to that is the natural next step.
-- **Channel membership (the Phase 3 idea).** With per-aspect tags, "who is in
-  #robots and can chat" is simply the discovery query
-  `tags=["chat=0", "channel=robots"]` (the robot already advertises
-  `channel=robots`) — no stored member list and no server-side gate needed.
-  If a stored ChatSpace is wanted anyway, put the condition in each entry's
-  Dependency ServiceFilter instead of subclassing `HyperSpaceImpl`
-  (constitution P5/P7; HyperSpace write validation belongs to the
-  `storage_mutation` gate of s_05 once that exists).
+- **Aspect tags.** A robot registers with one tag per Interface it
+  implements, `chat=0 robot=0 move=0 perceive=0 telemetry=0` (the ADR-025
+  convention), plus `botname=`, `channel=`, `kind=`, `commands=`. The
+  agent discovers robots with `implements(tags, "Robot")`; a
+  ServiceFilter can select on `tags=["robot=0"]`. Versioning comes free:
+  a `move=1` robot simply does not match a `move=0` client.
+- **One world process, one Actor per robot.** The earlier design (each
+  robot a hyperspace collection of lazily started source/target
+  processes, with an embedded ProcessManager) is in the git history. It
+  was replaced because every known issue came from the process split.
+- **Hosting.** The web server creates ChatRobotAgent Actors in its own
+  process (Aiko Services supports several Services per process). One
+  framework detail: discovery registered after the services cache has
+  loaded gets no replay of known Services (a TODO in `share.py`), so
+  `ChatRobotAgent.attach_known_services()` reads the cache itself.
+- **Service ids are never reused.** `aiko.process.remove_service()`
+  decrements the counter that also generates Service ids, so the next
+  Actor created in the process would share a topic path with a live one
+  and the two would hear each other's messages. `ChatRobotAgent.detach()`
+  restores the counter. Worth an upstream fix.
+- **Request/response from HTTP threads.** `web.py` calls the world with a
+  per-request response topic and waits on a queue. Never do that on the
+  Aiko event thread: the reply arrives on it.
 
-## Findings / known issues
+## Known issues
 
-- **ECConsumer filters must be lists.** `share.py` serialises the share
-  request with `generate()`, so a filter passed as the string `"(pose)"`
-  arrives as a quoted string and matches nothing (no sync, no updates).
-  Pass `["pose"]`.
-- **Channel `robots` is not in the ChatServer's channel list**
-  (general, llm, random, robot, yolo). The server republishes to any
-  channel topic, so it works, but `:lc` won't show it. Avoid `robot`: the
-  server treats that recipient specially (XGO robot routing).
-- **Command ordering across lazily-started elements is not guaranteed.**
-  Each element drains its own pending queue when it connects, so on a cold
-  start "move, turn, move…" can interleave out of order. Proper fix:
-  serialize commands robot-side with completion acks. Warm runs are ordered.
-- The framework doesn't persist ServiceFilter/LCM/storage details in storage
-  files yet (open TODO); the `(bootstrap ...)` S-expression in
-  `_robot_space_` dependency files is a proposed answer to "what is stored in
-  each Dependency storage file?".
-- Robots execute only messages *starting* with their `@@botname` (prose that
-  merely mentions them is ignored) — needed once the LLM agent started
-  chatting about robots.
-- The robot's HyperSpace join handler fires twice on startup (harmless:
-  `create()`/`add()` are idempotent).
+- Channel `robots` is not in the ChatServer's channel list (`:lc`); the
+  server relays to any channel, so it works. Avoid the channel `robot`,
+  which the server routes to XGO robots.
+- The agent sends robot commands one second apart; order is kept because
+  the world applies each instantly.
+- No identity: anyone can drive any robot, by design for now.
