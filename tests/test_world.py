@@ -31,7 +31,7 @@ def test_state_survives_a_restart():
     reloaded.database, reloaded.listener = database, None
     reloaded.robots = {r["name"]: r for r in database.list_robots()}
     assert reloaded.get("t1")["x"] == 50.0
-    assert reloaded.get("t1")["kind"] == "arrow"
+    assert reloaded.get("t1")["kind"] == "xgo"
     assert reloaded.get("t1")["owner"] == "anj"
 
 
@@ -63,7 +63,7 @@ def test_errors():
         world.move("t1", "far")
     with pytest.raises(WorldError):
         world.move("t1", math.inf)
-    assert world.create("t1", kind="arrow")["kind"] == "turtle"  # idempotent
+    assert world.create("t1", kind="xgo")["kind"] == "turtle"  # idempotent
 
 
 def test_pose_text_round_trip():
