@@ -8,6 +8,8 @@ the browser. A live instance is at **https://turtle.aiko.hashtag.ai**
 (the in-page [guide](https://turtle.aiko.hashtag.ai/guide) is the
 friendliest start).
 
+![The home page: the world map on the left, the #robots chat on the right](docs/screenshot.png)
+
 Built on the official, unmodified
 [aiko_services](https://github.com/geekscape/aiko_services) and
 [aiko_chat](https://github.com/geekscape/aiko_chat). Everything here is
