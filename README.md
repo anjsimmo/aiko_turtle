@@ -322,10 +322,12 @@ robots are.
 
 ## Known issues
 
-- Removing a wildcard message handler in aiko_services raises (process.py
-  does `del` on a list), so `web.py` keeps one handler per distinct MQTT
-  topic pattern watched through `/api/mqtt` and fans out to the current
-  watchers instead. Worth an upstream fix.
+- aiko_services' message dispatcher (process.py `topic_matcher`) matches
+  `prefix/#` one level deep only and `+` patterns by their first and last
+  token, so a handler for `aiko/#` never sees `aiko/host/pid/1/in`.
+  Removing a wildcard handler also raises (`del` on a list). So `/api/mqtt`
+  in `web.py` uses its own paho-mqtt client, same broker and credentials,
+  and lets the broker do the matching. Both worth an upstream fix.
 
 - Channel `robots` is not in the ChatServer's channel list (`:lc`); the
   server relays to any channel, so it works. Avoid the channel `robot`,

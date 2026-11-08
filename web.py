@@ -66,6 +66,7 @@ class AikoBackend(aiko.Actor):
         self.chat_share = {}            # the ChatServer's share (channel_list)
         self.chat_consumer = None
         self.mqtt_watchers = {}     # topic pattern -> {clients with put()}
+        self.mqtt_watch_client = None   # paho client, see _mqtt_client()
         self.mqtt_lock = threading.Lock()
         self.hosted = {}            # robot name -> ChatRobotAgent (ours)
         self.external = set()       # robots with their own live process
@@ -304,12 +305,40 @@ class AikoBackend(aiko.Actor):
             raise BackendError(422, f"topic must start with {prefix}")
         return topic
 
+    def _mqtt_client(self):
+        """A separate paho client for watching: the broker does the
+        wildcard matching.  Aiko's own dispatcher (process.py
+        topic_matcher) matches "prefix/#" one level deep only and "+"
+        patterns by their first and last token, so a handler registered
+        for "aiko/#" through add_message_handler() never sees the deeper
+        topics.  Same broker, credentials and TLS setting as Aiko"""
+        if self.mqtt_watch_client:
+            return self.mqtt_watch_client
+        import paho.mqtt.client as mqtt
+        message = aiko.process.message
+        client = mqtt.Client(transport=message.mqtt_transport)
+        if message.mqtt_tls_enabled:
+            client.tls_set()
+        if message.mqtt_username:
+            client.username_pw_set(
+                message.mqtt_username, message.mqtt_password)
+        client.on_connect = self._mqtt_on_connect
+        client.on_message = self._mqtt_on_message
+        client.reconnect_delay_set(1, 30)
+        client.connect_async(message.mqtt_host, message.mqtt_port,
+                             keepalive=60)
+        client.loop_start()
+        self.mqtt_watch_client = client
+        return client
+
+    def _mqtt_on_connect(self, client, _userdata, _flags, _rc):
+        with self.mqtt_lock:          # (re)subscribe everything watched
+            for pattern in self.mqtt_watchers:
+                client.subscribe(pattern)
+
     def mqtt_subscribe(self, topic, client):
         """client.put({"topic", "payload", "timestamp"}) for every message
-        on topic (wildcards allowed) until mqtt_unsubscribe().  One Aiko
-        handler per distinct topic, kept for good: removing a wildcard
-        handler trips an aiko_services bug (process.py does "del" on the
-        wildcard list), and the set of topics people ask for is small"""
+        on topic (wildcards allowed) until mqtt_unsubscribe()"""
         topic = self._mqtt_topic(topic)
         with self.mqtt_lock:
             if topic not in self.mqtt_watchers:
@@ -317,24 +346,29 @@ class AikoBackend(aiko.Actor):
                     raise BackendError(429, "too many distinct topics watched; "
                                        "use a wildcard pattern")
                 self.mqtt_watchers[topic] = set()
-                self.add_message_handler(self._mqtt_handler, topic)
+                self._mqtt_client().subscribe(topic)
             self.mqtt_watchers[topic].add(client)
 
     def mqtt_unsubscribe(self, topic, client):
         with self.mqtt_lock:
-            self.mqtt_watchers.get(topic, set()).discard(client)
+            watchers = self.mqtt_watchers.get(topic)
+            if watchers is None:
+                return
+            watchers.discard(client)
+            if not watchers:
+                del self.mqtt_watchers[topic]
+                self._mqtt_client().unsubscribe(topic)
 
-    def _mqtt_handler(self, _aiko, message_topic, payload_in):
-        if isinstance(payload_in, bytes):
-            payload_in = payload_in.decode("utf-8", "replace")
-        message = {"kind": "mqtt", "topic": message_topic,
-                   "payload": str(payload_in), "timestamp": time.time()}
+    def _mqtt_on_message(self, _client, _userdata, message):
+        payload = message.payload.decode("utf-8", "replace")
+        event = {"kind": "mqtt", "topic": message.topic,
+                 "payload": payload, "timestamp": time.time()}
         with self.mqtt_lock:
             clients = [client for pattern, watchers in self.mqtt_watchers.items()
-                       if _topic_matches(pattern, message_topic)
+                       if _topic_matches(pattern, message.topic)
                        for client in watchers]
         for client in clients:
-            client.put(message)
+            client.put(event)
 
     def mqtt_watch(self, topic, seconds, limit):
         box = queue.Queue()
