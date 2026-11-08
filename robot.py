@@ -85,12 +85,16 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Perceive, Telemetry):
     def _world_add_handler(self, service_details, service):
         self.print(f"world connected: {service_details[0]}")
         self.world = service
+        self.world_topic = service_details[0]
         self.world.create_robot(self.robot_name, self.kind, self.owner,
                                 self.host, self.world_response_topic)
 
     def _world_remove_handler(self, service_details):
+        if service_details[0] != getattr(self, "world_topic", None):
+            return                  # another world of the same name, not ours
         self.print("world disconnected")
         self.world = None
+        self.world_topic = None
 
     def _world_response_handler(self, _aiko, topic, payload_in):
         try:

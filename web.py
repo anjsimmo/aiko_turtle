@@ -45,6 +45,7 @@ class AikoBackend(aiko.Actor):
         self.channel = channel
         self.hub = EventHub()
         self.world = None
+        self.world_topic = None
         self.ec_consumer = None
         self.chat_server = None
         self.chat_topic = None
@@ -96,6 +97,7 @@ class AikoBackend(aiko.Actor):
     def _world_add_handler(self, service_details, service):
         print(f"WEB: world connected: {service_details[0]}", flush=True)
         self.world = service
+        self.world_topic = service_details[0]
         if self.ec_consumer:
             self.ec_consumer.terminate()
         self.hub.clear_robots()
@@ -108,8 +110,11 @@ class AikoBackend(aiko.Actor):
         threading.Thread(target=self.rehost_robots, daemon=True).start()
 
     def _world_remove_handler(self, service_details):
+        if service_details[0] != self.world_topic:
+            return                  # another world of the same name, not ours
         print("WEB: world disconnected", flush=True)
         self.world = None
+        self.world_topic = None
         if self.ec_consumer:
             self.ec_consumer.terminate()
             self.ec_consumer = None

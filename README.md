@@ -148,30 +148,15 @@ backend.
 The world is the only writer. Restart anything and the robots are where
 they were. Change the database with one variable (`TURTLE_DATABASE_URL`).
 
-## 24x7 with the ProcessManager
+## Deploying on a server
 
-Follow the aiko_services tutorial
-[production_instance.md](https://github.com/geekscape/aiko_services/blob/master/documentation/tutorials/production_instance.md)
-and add the entries from `supervisor.json.example` to your
-`${HOST}_supervisor.json` (fix the `cwd` paths). The `.env` is read by
-`config.py` in every process, so the definition file needs no variables;
-the only thing the `systemd` unit must provide is a `PATH` that finds the
-right `python3`, for example with `Environment=PATH=/path/to/venv/bin:...`.
-
-## Behind nginx with HTTPS
-
-The web server binds localhost. A reverse proxy needs streaming for the
-SSE endpoint; `certbot --nginx` adds the certificate:
-
-```nginx
-location / {
-    proxy_pass http://127.0.0.1:8123;
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-    proxy_buffering off;          # /events is server-sent events
-    proxy_read_timeout 1h;
-}
-```
+[docs/deployment.md](docs/deployment.md) walks through the public
+instance at **https://turtle.aiko.hashtag.ai** step by step: the
+aiko_services production instance, `.env`, the three entries in
+`${HOST}_supervisor.json` (from `supervisor.json.example`), nginx with a
+Let's Encrypt certificate, DNS, and how to update it (`git pull`, then
+`sudo systemctl restart aiko.service`). The web server binds localhost;
+the proxy needs `proxy_buffering off` for the SSE endpoint.
 
 ## Files
 
@@ -190,7 +175,7 @@ location / {
 | `tests/` | pytest |
 | `start.sh` `stop.sh` `env.sh` | local convenience |
 | `supervisor.json.example` | ProcessManager definition entries |
-| `docs/` | the 2026-08-22 imagineering session report |
+| `docs/` | `deployment.md` (server setup and updates) and the 2026-08-22 imagineering session report |
 
 ## Design notes
 
