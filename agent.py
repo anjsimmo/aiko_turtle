@@ -173,7 +173,9 @@ Discovered robots:
 
 Command semantics: move D moves D units forward (negative = backwards),
 turn A turns A degrees counter-clockwise, reset returns to the origin,
-look reports the pose, telemetry reports battery, interfaces lists interfaces.
+grasp/release close and open a gripper (arms only), look reports the pose,
+telemetry reports battery, interfaces lists interfaces.  Each robot lists
+the commands its kind supports; never send one it does not list.
 
 Recent channel history (oldest first):
 {history_text}

@@ -3,13 +3,16 @@
 # Aiko Chat and Robot Interfaces, per "2026-08-15: Aiko Services Design"
 #
 # <Chat>  ... send_message / receive_message
-# <Robot> ... composed with one or more of <Move> <Telemetry> <Perceive>
+# <Robot> ... composed with one or more of <Move> <Grasp> <Telemetry> <Perceive>
 #
 # An Aiko "Interface" is a class whose methods are all @abstractmethod.
 # An Actor implementation inherits the Interfaces it supports and defines
-# the methods concretely.  Implemented Interfaces are advertised in the
-# Service tags as "interfaces=..." so that other Services (e.g ChatSpace)
-# can check "MUST implement <Chat>" as a condition of membership.
+# the methods concretely.  Each implemented Interface is advertised as its
+# own Service tag, "move=0", "grasp=0", ... (one aspect per tag, as the
+# framework's ADR-025 / display protocol do), so that a ServiceFilter can
+# select on a single capability ("tags=['move=0']") and a version bump
+# ("move=1") simply stops matching older clients.  Which Interfaces a
+# robot has depends on its kind (kinds.py).
 
 from abc import abstractmethod
 import inspect
@@ -69,6 +72,18 @@ class Perceive(aiko.Interface):
         pass
 
 
+class Grasp(aiko.Interface):
+    aiko.Interface.default("Grasp", "interfaces.GraspDefault")
+
+    @abstractmethod
+    def grasp(self):
+        pass
+
+    @abstractmethod
+    def release(self):
+        pass
+
+
 class Robot(aiko.Interface):
     aiko.Interface.default("Robot", "interfaces.RobotDefault")
 
@@ -109,6 +124,11 @@ class PerceiveDefault(Perceive):
     snapshot = _unimplemented("Perceive", "snapshot")
 
 
+class GraspDefault(Grasp):
+    grasp = _unimplemented("Grasp", "grasp")
+    release = _unimplemented("Grasp", "release")
+
+
 class RobotDefault(Robot):
     get_interfaces = _unimplemented("Robot", "get_interfaces")
 
@@ -135,10 +155,13 @@ def interface_names(instance_or_class):
     return names
 
 
-def aspect_tags(instance_or_class, version=0):
-    """One tag per implemented Interface: ["chat=0", "robot=0", ...]"""
-    return [f"{name.lower()}={version}"
-            for name in interface_names(instance_or_class)]
+def aspect_tags(instance_or_class_or_names, version=0):
+    """One tag per implemented Interface: ["chat=0", "robot=0", ...].
+    Takes an Actor, a class, or a list of Interface names"""
+    names = instance_or_class_or_names
+    if not isinstance(names, (list, tuple)):
+        names = interface_names(names)
+    return [f"{name.lower()}={version}" for name in names]
 
 
 def implements(tags, interface_name):

@@ -6,8 +6,9 @@ import re
 import threading
 import time
 
-COMMANDS = "move D, turn A, stop, reset, look, telemetry, interfaces, join C"
-COMMAND_NAMES = "move,turn,stop,reset,look,telemetry,interfaces,join"
+COMMANDS = ("move D, turn A, stop, reset, grasp, release, look, telemetry, "
+            "interfaces, join C")
+COMMAND_NAMES = "move,turn,stop,reset,grasp,release,look,telemetry,interfaces,join"
 
 ROBOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
@@ -29,6 +30,10 @@ def parse_command(text):
             return "stop", []
         case ["reset"] | ["home"]:
             return "reset", []
+        case ["grasp"] | ["grab"] | ["close"]:
+            return "grasp", []
+        case ["release"] | ["open"]:
+            return "release", []
         case ["look"]:
             return "look", []
         case ["telemetry"] | ["battery"]:

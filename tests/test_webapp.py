@@ -12,6 +12,7 @@ class FakeBackend:
         self.hub = EventHub()
         self.world = World("sqlite://", listener=self._changed)
         self.sent = []
+        self.following = {"robots"}
 
     def _changed(self, event, record):
         if event == "destroyed":
@@ -53,16 +54,28 @@ class FakeBackend:
     def history(self, name, limit):
         return self._guard(self.world.history, name, limit)
 
-    def send_chat(self, username, message):
-        self.sent.append((username, message))
+    def send_chat(self, username, message, channel=None):
+        channel = channel or "robots"
+        self.sent.append((username, message, channel))
         self.hub.publish_chat({"username": username, "message": message,
-                               "timestamp": 1.0})
+                               "channel": channel, "timestamp": 1.0})
+
+    def channels(self):
+        return {"default": "robots", "following": sorted(self.following),
+                "known": ["general", "robots"]}
+
+    def follow_channel(self, channel):
+        self.following.add(channel)
+        return self.channels()
+
+    def system(self):
+        return {"mqtt": {"host": "fake"}, "services": []}
 
 
 @pytest.fixture
 def client():
     backend = FakeBackend()
-    client = TestClient(create_app(backend))
+    client = TestClient(create_app(backend, api_token=""))   # open, whatever .env says
     client.backend = backend
     return client
 
@@ -96,10 +109,48 @@ def test_validation(client):
 def test_chat_and_docs(client):
     assert client.post("/api/chat",
         json={"message": "@@t1 move 1", "username": "zoe"}).status_code == 202
-    assert client.backend.sent == [("zoe", "@@t1 move 1")]
+    assert client.backend.sent == [("zoe", "@@t1 move 1", "robots")]
     assert client.get("/api/chat").json()[0]["username"] == "zoe"
     assert client.get("/docs").status_code == 200
-    assert "Turtle World" in client.get("/").text
+    for path in ("/", "/world", "/chat", "/guide", "/system"):
+        assert "Turtle World" in client.get(path).text, path
+
+
+def test_channels(client):
+    assert client.post("/api/chat", json={"message": "hi", "username": "@zoe",
+                       "channel": "general"}).json()["channel"] == "general"
+    assert client.get("/api/chat?channel=general").json()[0]["message"] == "hi"
+    assert client.get("/api/chat").json() == []
+    assert client.post("/api/chat/channels",
+                       json={"channel": "lab"}).status_code == 201
+    assert "lab" in client.get("/api/chat/channels").json()["following"]
+    assert client.post("/api/chat/channels",
+                       json={"channel": "no spaces"}).status_code == 422
+
+
+def test_kinds_and_system(client):
+    kinds = {k["name"]: k for k in client.get("/api/kinds").json()}
+    assert "Move" not in kinds["pi"]["interfaces"]
+    assert "grasp" in kinds["lekiwi"]["commands"]
+    assert client.post("/api/robots",
+                       json={"name": "dog", "kind": "xgo"}).status_code == 201
+    assert client.get("/api/robots/dog").json()["kind"] == "xgo"
+    assert client.get("/api/system").json()["mqtt"]["host"] == "fake"
+    assert client.get("/api/status").json()["auth"] is False
+
+
+def test_bearer_token():
+    backend = FakeBackend()
+    client = TestClient(create_app(backend, api_token="TURTLES_ALL_THE_WAY_DOWN"))
+    assert client.get("/api/status").json()["auth"] is True
+    assert client.get("/api/robots").status_code == 200          # reads open
+    assert client.post("/api/robots", json={"name": "t1"}).status_code == 401
+    assert client.post("/api/robots", json={"name": "t1"},
+        headers={"Authorization": "Bearer wrong"}).status_code == 401
+    ok = {"Authorization": "Bearer TURTLES_ALL_THE_WAY_DOWN"}
+    assert client.post("/api/robots", json={"name": "t1"}, headers=ok).status_code == 201
+    assert client.delete("/api/robots/t1").status_code == 401
+    assert client.delete("/api/robots/t1", headers=ok).status_code == 200
 
 
 def test_event_replay_for_a_new_page(client):

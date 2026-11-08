@@ -1,14 +1,32 @@
 # aiko_turtle
 
-Virtual robots in a shared world, for AI + ML + robotics experiments.
-Anyone can create a robot, drive it from the chat, from a REST API or
-from an LLM agent, and watch every robot move in the browser.
+Virtual robots in a shared world, for the AI+ML+Robots community to learn
+and play with [Aiko Services](https://github.com/geekscape/aiko_services).
+Anyone can create a robot, drive it from the chat, from a REST API, from
+an LLM agent or from their own Aiko code, and watch every robot move in
+the browser. A live instance is at **https://turtle.aiko.hashtag.ai**
+(the in-page [guide](https://turtle.aiko.hashtag.ai/guide) is the
+friendliest start).
 
 Built on the official, unmodified
 [aiko_services](https://github.com/geekscape/aiko_services) and
 [aiko_chat](https://github.com/geekscape/aiko_chat). Everything here is
 application code; the shared services (MQTT broker, Registrar, HyperSpace,
 ChatServer) run on the community instance **aiko.hashtag.ai**.
+
+**Who this is for.** Beginners who want to see a robot move in ten
+minutes, and developers who want to build agents and robots on a real
+distributed framework. The virtual robots use the same Interfaces a
+physical one would, so what you write here plugs into a real XGO, LoliBot
+or LeKiwi at the [meetup](https://www.meetup.com/ai-ml-robots/).
+
+**How it was made.** Much of this code was written with an AI coding
+assistant, with a human deciding what to build, reviewing it and running
+it. The hard part, the design of Aiko Services itself and the years of
+study-group discussion behind the Interfaces, is human work by the Aiko
+author and the community, and this project tries to follow it faithfully.
+Pull requests, issues and ideas are welcome from everyone, whatever your
+level; the "Contributing" section says where to start.
 
 **Last tested with** aiko_services `39796ee` (2026-11-07) and aiko_chat
 `9edb211` (2026-10-31), the heads of `master` and `main` at the time. The
@@ -20,9 +38,10 @@ commits to compare against.
 | Process | What it is |
 |---|---|
 | `virtual_world.py` | **VirtualWorld** Actor: holds every robot's pose, persists them in a database, publishes them as the share `robots.<name>` |
-| `robot.py` | **ChatRobotAgent**: one Actor per robot, implementing the `<Chat>` and `<Robot>` (`<Move>` `<Perceive>` `<Telemetry>`) Interfaces. Its body is in the world; it is the robot's voice in the chat and its entry in the Registrar |
-| `web.py` | **web server** (FastAPI): the page, the REST API (`/docs`) and a live SSE stream. It also *hosts* a ChatRobotAgent for every robot created over REST, so those answer in the chat too |
+| `robot.py` | **ChatRobotAgent**: one Actor per robot, implementing `<Chat>` and `<Robot>` composed of the Interfaces its kind has (`<Move>` `<Grasp>` `<Perceive>` `<Telemetry>`, see `kinds.py`). Its body is in the world; it is the robot's voice in the chat and its entry in the Registrar |
+| `web.py` | **web server** (FastAPI): the pages (`/`, `/world`, `/chat`, `/guide`, `/system`), the REST API (`/docs`) and a live SSE stream. It also *hosts* a ChatRobotAgent for every robot created over REST, so those answer in the chat too |
 | `agent.py` | **LLM ChatAgent** `@@pilot`: discovers robots from Registrar tags and drives them in natural language. Rate limited |
+| `mcp_server.py` | **MCP server**: the robots as tools for Claude Code, Claude Desktop or any MCP client, over the REST API |
 
 Every robot in the world is always answerable in the chat and listed in
 the Registrar:
@@ -68,6 +87,7 @@ you are most likely to touch:
 | `TURTLE_DATABASE_URL` | `sqlite:///turtle.db` | any SQLAlchemy URL; relative to the working directory, like HyperSpace storage |
 | `TURTLE_CHANNEL` | `robots` | chat channel |
 | `TURTLE_WEB_PORT` | `8123` | the web server binds `127.0.0.1` |
+| `TURTLE_API_TOKEN` | *(empty)* | set it and every POST/DELETE on the REST API needs `Authorization: Bearer <token>`; reads and pages stay open |
 | `OPENAI_API_KEY` | | the agent falls back to the `claude` CLI without it |
 | `TURTLE_LLM_RATE_PER_MINUTE` | `10` | agent requests per minute (also `_USER_` per user, and `_QUEUE_LIMIT`) |
 
@@ -89,9 +109,12 @@ Or by hand, each in its own terminal, after `source env.sh`:
 
 ## Try it
 
-Open **http://localhost:8123**. The world is on the left: create a robot,
-click one to select it, use the quick-command buttons. The `#robots`
-channel is on the right, with your name in the box (any name).
+Open **http://localhost:8123**. The world is on the left: create a robot
+(pick a kind), click one to select it, use the quick-command buttons. The
+`#robots` channel is on the right, with your name in the box (any name;
+humans are `@name`, the page adds the `@`). The dropdown in the chat
+header switches channels. `/world` is the map alone, `/chat` the chat
+alone, `/guide` the human guide, `/system` the Registrar and MQTT details.
 
 **REST** (interactive docs at http://localhost:8123/docs):
 
@@ -108,7 +131,8 @@ curl -N localhost:8123/events                  # live poses + chat (SSE)
 curl -X DELETE localhost:8123/api/robots/my_turtle
 ```
 
-Every drive call returns the new pose. Kinds: `turtle`, `arrow`.
+Every drive call returns the new pose. `GET /api/kinds` lists the kinds
+and what each can do; `GET /api/chat/channels` the channels.
 
 **Chat** (the page, `aiko_chat repl` after `:cc robots`, or
 `aiko_chat send robots "..."`):
@@ -116,6 +140,7 @@ Every drive call returns the new pose. Kinds: `turtle`, `arrow`.
 ```text
 @@my_turtle move 100         ;; <Move>, replies with the new pose
 @@my_turtle turn 90          ;; degrees counter-clockwise
+@@my_arm grasp               ;; <Grasp>, kinds with a gripper
 @@my_turtle look             ;; <Perceive>
 @@my_turtle telemetry        ;; <Telemetry>
 @@my_turtle interfaces       ;; <Robot>
@@ -125,16 +150,66 @@ Every drive call returns the new pose. Kinds: `turtle`, `arrow`.
 
 Robots act only on messages that *start* with their `@@name`. Replies end
 with ` !!!!`, the aiko_chat convention that stops bots answering bots.
+Forget the `@@` and the page shows a reminder under the chat.
+
+**Your own code** (the full power, from any machine; see `/guide`):
+
+```bash
+./robot.py run --name my_dog --kind xgo      # your process is the robot
+python3 examples/aiko_drive.py my_dog        # discover it, call its <Move> directly
+python3 examples/agent_bot.py                # a 60-line chat agent: @@square my_dog
+python3 examples/rest_drive.py my_dog        # the same over REST, stdlib only
+```
+
+`examples/colab_turtle.ipynb` walks a beginner through both paths in
+Google Colab (written for Colab, not yet run there: reports welcome).
+
+**MCP** (Claude Code, Claude Desktop, any MCP client), no Aiko needed:
+
+```bash
+pip install mcp
+claude mcp add turtle -e TURTLE_URL=https://turtle.aiko.hashtag.ai -- python3 $PWD/mcp_server.py
+```
+
+## Robot kinds
+
+| kind | what it is | Interfaces |
+|---|---|---|
+| `turtle` | the classic drawing turtle | Move Perceive Telemetry |
+| `lolibot` | the OHC [LoliBot](https://openhardwareconf.org/wiki/LoliBot), and Jon Oxer's BeetleBot | Move Perceive Telemetry |
+| `xgo` | XGO robot dog | Move Perceive Telemetry |
+| `lekiwi` | LeKiwi: LeRobot's omni base with an SO-101 arm | Move Grasp Perceive Telemetry |
+| `so101` | LeRobot SO-101 arm: grasps, does not drive | Grasp Perceive Telemetry |
+| `drone` | a generic quadcopter (2D in this world) | Move Perceive Telemetry |
+| `pi` | a Raspberry Pi with display, speaker and mic: senses, does not move | Perceive Telemetry |
+| `arrow` | a plain marker | Move Perceive Telemetry |
+
+A kind decides the sprite on the map, the chat commands a robot accepts
+(`@@pi move 10` gets "a pi cannot move") and the aspect tags it registers
+with. Register a robot of a kind and `aiko_registrar list` shows exactly
+what it can do.
+
+**Adding a kind** (a pull request is very welcome, or fork and build your
+own world on top of this one):
+
+1. One entry in `kinds.py`: label, description, the Interfaces it has.
+2. One drawing function in `static/index.html`, next to `drawTurtle`:
+   top-down, nose along +x, about 40 px across, in the robot's colour
+   `col`. Add it to the `SPRITES` table.
+3. If it needs a new Interface, add the Interface to `interfaces.py`
+   (abstract methods plus a `*Default` placeholder), the command to
+   `core.parse_command` and `kinds.COMMAND_INTERFACES`, and the
+   implementation to `ChatRobotAgent`. Run `pytest`.
 
 ## Tests
 
 ```bash
-python3 -m pytest -q tests      # 13 tests, well under a second, no broker needed
+python3 -m pytest -q tests      # 17 tests, well under a second, no broker needed
 ```
 
 They cover the world maths and persistence, the chat command and LLM
-output parsers, the rate limiter, and the REST API against a fake
-backend.
+output parsers, the rate limiter, the kinds, and the REST API (including
+channels and the bearer token) against a fake backend.
 
 ## State
 
@@ -166,25 +241,37 @@ the proxy needs `proxy_buffering off` for the SSE endpoint.
 | `db.py` | the `robots` and `events` tables (SQLAlchemy Core) |
 | `world_model.py` | the world without Aiko: poses, maths, persistence |
 | `virtual_world.py` | the VirtualWorld Actor |
-| `interfaces.py` | `<Chat>` `<Robot>` `<Move>` `<Perceive>` `<Telemetry>` and the aspect tags |
+| `interfaces.py` | `<Chat>` `<Robot>` `<Move>` `<Grasp>` `<Perceive>` `<Telemetry>` and the aspect tags |
+| `kinds.py` | the robot kinds: Interfaces and commands of each |
 | `core.py` | chat command parser, LLM output parser, rate limiter, name rule |
 | `robot.py` | ChatRobotAgent (`./robot.py run`, and `host_robot()` for the web server) |
 | `agent.py` | the LLM ChatAgent |
-| `webapp.py` | the FastAPI app and page (no Aiko; testable) |
+| `webapp.py` | the FastAPI app and routes (no Aiko; testable) |
+| `static/` | the pages: `index.html` (also `/world`, `/chat`), `guide.html`, `system.html` |
+| `mcp_server.py` | MCP server over the REST API |
+| `examples/` | `rest_drive.py`, `aiko_drive.py`, `agent_bot.py`, `colab_turtle.ipynb` |
 | `web.py` | the Aiko-connected backend and server |
 | `tests/` | pytest |
 | `start.sh` `stop.sh` `env.sh` | local convenience |
 | `supervisor.json.example` | ProcessManager definition entries |
-| `docs/` | `deployment.md` (server setup and updates) and the 2026-08-22 imagineering session report |
+| `docs/` | `deployment.md` (server setup and updates), `aiko.hashtag.ai/` (the landing page of the community host), the 2026-08-22 imagineering session report |
 
 ## Design notes
 
 - **Aspect tags.** A robot registers with one tag per Interface it
-  implements, `chat=0 robot=0 move=0 perceive=0 telemetry=0` (the ADR-025
-  convention), plus `botname=`, `channel=`, `kind=`, `commands=`. The
-  agent discovers robots with `implements(tags, "Robot")`; a
-  ServiceFilter can select on `tags=["robot=0"]`. Versioning comes free:
-  a `move=1` robot simply does not match a `move=0` client.
+  implements, `chat=0 robot=0 move=0 perceive=0 telemetry=0` (the
+  framework's one-aspect-per-tag convention, as in ADR-025 and the
+  display protocol), plus `botname=`, `channel=`, `kind=`, `commands=`.
+  The agent discovers robots with `implements(tags, "Robot")`; a
+  ServiceFilter can select on `tags=["move=0"]`. Versioning comes free:
+  a `move=1` robot simply does not match a `move=0` client. A kind
+  without `<Move>` simply has no `move=0` tag.
+- **The Interfaces** follow the 2026-08-15 study-group design: `<Robot>`
+  composed of `<Move>` (move, turn, stop), `<Telemetry>`, `<Perceive>`,
+  and now `<Grasp>` for the arms. `<Navigation>` (move_to a landmark) and
+  the 3D `<Move>` for drones are the obvious next ones; the design's
+  `walk`, `start`/`stop` for low-cost drones, and bumper-style triggers
+  are open questions worth a discussion at the meetup.
 - **One world process, one Actor per robot.** The earlier design (each
   robot a hyperspace collection of lazily started source/target
   processes, with an embedded ProcessManager) is in the git history. It
@@ -202,6 +289,22 @@ the proxy needs `proxy_buffering off` for the SSE endpoint.
 - **Request/response from HTTP threads.** `web.py` calls the world with a
   per-request response topic and waits on a queue. Never do that on the
   Aiko event thread: the reply arrives on it.
+
+## Contributing
+
+Everything is welcome: a new robot kind, a better sprite, a tutorial, a
+bug report, a question. Good first contributions:
+
+- a kind for a robot you own (see "Adding a kind" above);
+- running `examples/colab_turtle.ipynb` in Colab and reporting what broke;
+- an example in another language against the REST API;
+- `<Navigation>` or a 3D `<Move>` for the drone.
+
+Open an issue or a pull request at
+[github.com/anjsimmo/aiko_turtle](https://github.com/anjsimmo/aiko_turtle),
+or bring it to the [AI+ML+Robots meetup](https://www.meetup.com/ai-ml-robots/)
+([ai-ml-robots.github.io](https://ai-ml-robots.github.io/)), where the real
+robots are.
 
 ## Known issues
 

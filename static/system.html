@@ -1,0 +1,78 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Turtle World: system</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root { --bg:#f7f6f2; --surface:#ffffff; --ink:#1c2420; --muted:#5c6b62; --line:#d8ded9; --accent:#0b7a4b; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#101512; --surface:#182019; --ink:#e6ece7; --muted:#93a398; --line:#2a352c; --accent:#3ecf8e; }
+}
+* { box-sizing:border-box; }
+body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 40px; font-family:"IBM Plex Mono",monospace; display:flex; flex-direction:column; align-items:center; }
+header { width:min(100%,1100px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 14px; }
+h1 { font-family:"Sora",sans-serif; font-size:1.3rem; margin:0; }
+nav { display:flex; flex-wrap:wrap; gap:14px; font-size:0.8rem; margin-left:auto; }
+nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { color:var(--accent); }
+main { width:min(100%,1100px); display:grid; gap:16px; }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:14px; min-width:0; font-size:0.8rem; }
+.panel h2 { font-family:"Sora",sans-serif; font-size:0.95rem; margin:0 0 10px; }
+.panel p { margin:6px 0; color:var(--muted); }
+table { border-collapse:collapse; width:100%; font-size:0.76rem; }
+th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-all; }
+th { color:var(--muted); font-weight:500; }
+td.tags { color:var(--muted); font-size:0.7rem; }
+pre { background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:10px; overflow-x:auto; font-size:0.76rem; margin:8px 0; }
+code { color:var(--accent); }
+a { color:var(--accent); }
+.hint { color:var(--muted); font-size:0.74rem; }
+</style></head><body>
+<header>
+  <h1>Turtle World <span style="font-family:'IBM Plex Mono';font-size:0.8rem;color:var(--muted)">system</span></h1>
+  <nav><a href="/">home</a><a href="/world">world</a><a href="/chat">chat</a><a href="/guide">guide</a><a href="/system" class="here">system</a><a href="/docs">REST API</a></nav>
+</header>
+<main>
+<section class="panel">
+  <h2>The shared Aiko services</h2>
+  <p>Every process here (the world, the robots, the chat server, you) finds the others through one MQTT broker and the Registrar. You can talk to all of it directly, no web server needed.</p>
+  <table id="mqtt"><tbody></tbody></table>
+  <p>Watch everything, from any machine with <code>mosquitto_sub</code>:</p>
+  <pre id="sub"></pre>
+  <p>Or in Python, with aiko_services installed (<a href="/guide">guide</a>): <code>aiko_registrar list</code> and <code>aiko_dashboard</code> show the same Registrar as the table below.</p>
+</section>
+<section class="panel">
+  <h2>Chat channels</h2>
+  <p id="channels"></p>
+</section>
+<section class="panel">
+  <h2>Registrar: who is running <span class="hint" id="cache"></span></h2>
+  <p>Every Service that has registered: the ProcessManager that keeps the 24x7 services up, the HyperSpace, the ChatServer, the world, each robot (one Service per robot, with its Interfaces as <code>move=0</code>-style tags), the LLM agent, and anyone who connects.</p>
+  <table id="services"><thead><tr><th>topic path</th><th>name</th><th>protocol</th><th>owner</th><th>tags</th></tr></thead><tbody></tbody></table>
+</section>
+</main>
+<script>
+function cell(tr, text, cls) { var td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.append(td); return td; }
+function row(table, cells, cls) { var tr = document.createElement("tr"); cells.forEach(function (c) { cell(tr, c, cls); }); table.append(tr); }
+function render() {
+  fetch("/api/system").then(function (r) { return r.json(); }).then(function (s) {
+    var m = s.mqtt || {}, mt = document.querySelector("#mqtt tbody"); mt.innerHTML = "";
+    [["MQTT broker", (m.host || "?") + ":" + (m.port || "1883")], ["namespace", m.namespace || "aiko"],
+     ["Registrar topic", m.registrar_topic || ""], ["ChatServer topic", m.chat_server_topic || "(not connected)"],
+     ["world topic", m.world_topic || "(not connected)"]].forEach(function (kv) { row(mt, kv); });
+    document.getElementById("sub").textContent =
+      "mosquitto_sub -h " + (m.host || "HOST") + " -t '" + (m.namespace || "aiko") + "/#' -v\n" +
+      "mosquitto_sub -h " + (m.host || "HOST") + " -t '" + (m.chat_server_topic || (m.namespace || "aiko") + "/+/+/+") + "/robots' -v      # the #robots channel\n" +
+      "mosquitto_sub -h " + (m.host || "HOST") + " -t '" + (m.world_topic || (m.namespace || "aiko") + "/+/+/+") + "/out' -v         # the world's poses";
+    var ch = s.channels || {};
+    document.getElementById("channels").textContent = "relayed to this page: #" + (ch.following || []).join("  #") +
+      "    known to the ChatServer: #" + (ch.known || []).join("  #") + "    (pick any channel on the chat page; a new one is created by using it)";
+    document.getElementById("cache").textContent = "(services cache: " + (s.cache_state || "?") + ", " + (s.services || []).length + " services)";
+    var st = document.querySelector("#services tbody"); st.innerHTML = "";
+    (s.services || []).forEach(function (svc) {
+      var tr = document.createElement("tr");
+      cell(tr, svc.topic_path); cell(tr, svc.name); cell(tr, svc.protocol); cell(tr, svc.owner); cell(tr, (svc.tags || []).join(" "), "tags");
+      st.append(tr);
+    });
+  });
+}
+render(); setInterval(render, 5000);
+</script></body></html>

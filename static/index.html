@@ -1,0 +1,494 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Turtle World</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root { --bg:#f7f6f2; --surface:#ffffff; --ink:#1c2420; --muted:#5c6b62;
+        --line:#d8ded9; --accent:#0b7a4b; --bot:#2456a6; --me:#eef7f1; --danger:#b23a3a; --warn:#8a5a00; --warnbg:#fff6e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#101512; --surface:#182019; --ink:#e6ece7; --muted:#93a398;
+          --line:#2a352c; --accent:#3ecf8e; --bot:#8fb4ff; --me:#1f2d24; --danger:#ff7b7b; --warn:#ffd27a; --warnbg:#2a2412; }
+}
+* { box-sizing:border-box; }
+body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 24px;
+       font-family:"IBM Plex Mono",monospace; display:flex; flex-direction:column;
+       align-items:center; min-height:100vh; }
+header { width:min(100%,1240px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 4px; }
+h1 { font-family:"Sora",sans-serif; font-size:1.3rem; margin:0; }
+nav { display:flex; flex-wrap:wrap; gap:14px; font-size:0.8rem; margin-left:auto; }
+nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { color:var(--accent); }
+#status { color:var(--muted); font-size:0.78rem; margin-bottom:14px; width:min(100%,1240px); }
+#grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px;
+        width:min(100%,1240px); align-items:start; }
+@media (max-width: 900px) { #grid { grid-template-columns:1fr; } }
+body.view-world #grid, body.view-chat #grid { grid-template-columns:1fr; width:min(100%,900px); }
+body.view-world #chatpanel, body.view-chat #worldpanel { display:none; }
+body.view-chat #messages { height:min(70vh,900px); }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:6px;
+         padding:12px; min-width:0; }
+.panel h2 { font-family:"Sora",sans-serif; font-size:0.95rem; margin:0 0 10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.panel h2 span { color:var(--muted); font-weight:normal; font-size:0.78rem; font-family:"IBM Plex Mono",monospace; }
+.panel h2 a { font-size:0.72rem; font-weight:normal; font-family:"IBM Plex Mono",monospace; margin-left:auto; }
+canvas { display:block; width:100%; height:auto; aspect-ratio:1/1; }
+#robots { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px; font-size:0.78rem; }
+#robots li { display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:4px; padding:4px 8px; cursor:pointer; }
+#robots li.selected { border-color:var(--accent); background:var(--me); }
+#robots .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+#robots .kind { color:var(--muted); font-size:0.7rem; }
+#robots .x { color:var(--danger); background:none; border:none; padding:0 2px; font-size:0.9rem; }
+#create { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+input, select { font-family:inherit; font-size:0.8rem; padding:5px 8px;
+   border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
+#pose { color:var(--accent); font-size:0.8rem; margin-top:8px; min-height:1.2em; }
+#kindinfo { color:var(--muted); font-size:0.74rem; margin-top:4px; min-height:1.1em; }
+button { font-family:"IBM Plex Mono",monospace; font-size:0.78rem;
+         background:var(--accent); color:var(--bg); border:none;
+         border-radius:4px; padding:6px 12px; cursor:pointer; }
+button:hover { opacity:0.88; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--muted); outline-offset:2px; }
+#messages { list-style:none; margin:0; padding:0; height:min(55vh,480px); overflow-y:auto;
+            border:1px solid var(--line); border-radius:4px; font-size:0.82rem; }
+#messages li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:0 8px;
+               padding:6px 10px; border-bottom:1px solid var(--line); word-break:break-word; }
+#messages li:last-child { border-bottom:none; }
+#messages .who { color:var(--muted); }
+#messages .bot .who { color:var(--bot); }
+#messages .me { background:var(--me); }
+#messages .me .who { color:var(--accent); }
+#messages .time { color:var(--muted); font-size:0.7rem; white-space:nowrap; }
+#empty { color:var(--muted); font-size:0.8rem; padding:10px; }
+#chips { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0; }
+#chips button { background:var(--surface); color:var(--ink); border:1px solid var(--line); }
+#chips button:hover { border-color:var(--accent); opacity:1; }
+#chips button:disabled { opacity:0.35; cursor:default; border-color:var(--line); }
+#send { display:flex; gap:8px; }
+#text, #who { font-size:0.85rem; padding:8px 10px; }
+#text { flex:1; min-width:0; } #who { width:9em; }
+#hint { display:none; margin-top:8px; padding:8px 10px; border-radius:4px; font-size:0.76rem;
+        background:var(--warnbg); color:var(--warn); border:1px solid var(--line); }
+#hint.show { display:block; }
+#hint code { font-weight:500; }
+#tokenrow { display:none; gap:8px; align-items:center; margin-top:8px; font-size:0.74rem; color:var(--muted); }
+#tokenrow.show { display:flex; }
+#token { flex:1; min-width:0; font-size:0.78rem; }
+a { color:var(--accent); }
+</style></head><body class="view-__VIEW__">
+<header>
+  <h1>Turtle World</h1>
+  <nav>
+    <a href="/" id="nav-home">home</a>
+    <a href="/world" id="nav-world">world</a>
+    <a href="/chat" id="nav-chat">chat</a>
+    <a href="/guide">guide</a>
+    <a href="/system">system</a>
+    <a href="/docs">REST API</a>
+  </nav>
+</header>
+<div id="status">connecting…</div>
+<main id="grid">
+<section class="panel" id="worldpanel">
+  <h2>World <span id="world"></span><a href="/world">full map</a></h2>
+  <canvas id="c" width="600" height="600"></canvas>
+  <ul id="robots"></ul>
+  <form id="create" autocomplete="off">
+    <input id="newname" placeholder="new robot name" aria-label="new robot name" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" required>
+    <select id="newkind" aria-label="kind"></select>
+    <button type="submit">create robot</button>
+  </form>
+  <div id="kindinfo"></div>
+  <div id="pose"></div>
+</section>
+<section class="panel" id="chatpanel">
+  <h2>#<select id="channel" aria-label="channel"></select> <span id="chatstate"></span><a href="/chat">full chat</a></h2>
+  <ol id="messages"><li id="empty">no messages yet</li></ol>
+  <div id="chips"></div>
+  <form id="send" autocomplete="off">
+    <input id="who" aria-label="your name" title="your name (anything you like; humans are @name)">
+    <input id="text" placeholder="@@robot move 100 — or ask __AGENT__" aria-label="message">
+    <button type="submit">send</button>
+  </form>
+  <div id="hint"></div>
+  <div id="tokenrow"><label for="token">API token</label><input id="token" type="password" placeholder="this instance needs a bearer token to create or drive robots"></div>
+</section>
+</main>
+<script>
+var AGENT = "__AGENT__", DEFAULT_CHANNEL = "__CHANNEL__", AUTH = __AUTH__, S = 600;
+var VIEW = "__VIEW__";
+document.getElementById(VIEW === "world" ? "nav-world" : VIEW === "chat" ? "nav-chat" : "nav-home").className = "here";
+
+// ---- identity: humans are @name, bots @@name ------------------------------
+function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+function load(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+function humanName(name) {
+  name = (name || "").trim().replace(/^@+/, "");
+  return name ? "@" + name : "@anonymous";
+}
+var who = document.getElementById("who");
+who.value = humanName(load("turtle.username", "__USERNAME__"));
+who.addEventListener("change", function () { who.value = humanName(who.value); store("turtle.username", who.value); });
+function me() { return humanName(who.value); }
+
+// ---- API token (only when this instance has one) ---------------------------
+var token = document.getElementById("token");
+token.value = load("turtle.token", "");
+token.addEventListener("change", function () { store("turtle.token", token.value.trim()); });
+if (AUTH) document.getElementById("tokenrow").className = "show";
+function api(path, method, body) {
+  var headers = { "Content-Type": "application/json" };
+  if (AUTH && token.value.trim()) headers["Authorization"] = "Bearer " + token.value.trim();
+  return fetch(path, { method: method || "GET", headers: headers, body: body ? JSON.stringify(body) : undefined })
+    .then(function (r) {
+      if (r.status === 401) { document.getElementById("tokenrow").className = "show"; token.focus(); }
+      return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }, function () { return { ok: r.ok, status: r.status, body: {} }; });
+    });
+}
+function explain(res) { return res.body && res.body.detail ? (typeof res.body.detail === "string" ? res.body.detail : JSON.stringify(res.body.detail)) : "HTTP " + res.status; }
+
+// ---- kinds ------------------------------------------------------------------
+var KINDS = {}, kindSelect = document.getElementById("newkind");
+fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list) {
+  list.forEach(function (k) {
+    KINDS[k.name] = k;
+    var o = document.createElement("option"); o.value = k.name; o.textContent = k.label; kindSelect.append(o);
+  });
+  kindSelect.value = load("turtle.kind", "turtle"); describeKind();
+});
+function describeKind() {
+  var k = KINDS[kindSelect.value]; if (!k) return;
+  document.getElementById("kindinfo").textContent = k.description + " — <" + k.interfaces.join("> <") + ">";
+  store("turtle.kind", kindSelect.value);
+}
+kindSelect.addEventListener("change", describeKind);
+
+// ---- the world --------------------------------------------------------------
+var canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
+if (!ctx.roundRect) {
+  ctx.roundRect = function (x, y, w, h, r) {
+    this.moveTo(x + r, y); this.arcTo(x + w, y, x + w, y + h, r);
+    this.arcTo(x + w, y + h, x, y + h, r); this.arcTo(x, y + h, x, y, r);
+    this.arcTo(x, y, x + w, y, r);
+  };
+}
+var robots = {}, selected = null;
+var PALETTE = ["#0b7a4b","#2456a6","#b5651d","#7b3fa0","#b23a3a","#1f8a8a","#8a7a1f","#c2185b"];
+function colorOf(name) {
+  var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+function colors() {
+  var s = getComputedStyle(document.documentElement);
+  return { line: s.getPropertyValue("--line").trim(), muted: s.getPropertyValue("--muted").trim(), bg: s.getPropertyValue("--surface").trim() };
+}
+function bounds() {
+  var xs = [0], ys = [0];
+  Object.values(robots).forEach(function (r) { r.trail.forEach(function (p) { xs.push(p[0]); ys.push(p[1]); }); });
+  var minX = Math.min.apply(null, xs) - 60, maxX = Math.max.apply(null, xs) + 60;
+  var minY = Math.min.apply(null, ys) - 60, maxY = Math.max.apply(null, ys) + 60;
+  var span = Math.max(maxX - minX, maxY - minY, 300);
+  return { minX: (minX + maxX) / 2 - span / 2, minY: (minY + maxY) / 2 - span / 2, span: span };
+}
+function draw() {
+  var c = colors(), b = bounds();
+  function T(p) { return [(p[0] - b.minX) / b.span * S, S - (p[1] - b.minY) / b.span * S]; }
+  ctx.clearRect(0, 0, S, S);
+  var step = Math.pow(10, Math.floor(Math.log10(b.span / 4)));
+  ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+  for (var gx = Math.ceil(b.minX / step) * step; gx < b.minX + b.span; gx += step) {
+    var a = T([gx, b.minY]), z = T([gx, b.minY + b.span]);
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(z[0], z[1]); ctx.stroke();
+  }
+  for (var gy = Math.ceil(b.minY / step) * step; gy < b.minY + b.span; gy += step) {
+    var a2 = T([b.minX, gy]), z2 = T([b.minX + b.span, gy]);
+    ctx.beginPath(); ctx.moveTo(a2[0], a2[1]); ctx.lineTo(z2[0], z2[1]); ctx.stroke();
+  }
+  var o = T([0, 0]);
+  ctx.fillStyle = c.muted; ctx.beginPath(); ctx.arc(o[0], o[1], 3, 0, 7); ctx.fill();
+  ctx.font = "10px 'IBM Plex Mono',monospace"; ctx.fillText("0,0", o[0] + 6, o[1] - 5);
+  var names = Object.keys(robots);
+  if (!names.length) {
+    ctx.fillStyle = c.muted; ctx.font = "12px 'IBM Plex Mono',monospace";
+    ctx.fillText("no robots yet — create one below", 20, 30);
+  }
+  names.forEach(function (name) {
+    var r = robots[name], col = colorOf(name);
+    if (r.trail.length > 1) {
+      ctx.strokeStyle = col; ctx.lineWidth = name === selected ? 3 : 2; ctx.lineCap = "round";
+      ctx.globalAlpha = name === selected || !selected ? 1 : 0.5;
+      ctx.beginPath(); var p0 = T(r.trail[0]); ctx.moveTo(p0[0], p0[1]);
+      for (var i = 1; i < r.trail.length; i++) { var p = T(r.trail[i]); ctx.lineTo(p[0], p[1]); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    var rp = T([r.x, r.y]);
+    drawSprite(r.type, rp[0], rp[1], r.heading * Math.PI / 180, c, col);
+    ctx.fillStyle = col; ctx.font = "11px 'IBM Plex Mono',monospace";
+    ctx.fillText(name, rp[0] + 22, rp[1] + 24);
+  });
+  var sel = robots[selected];
+  document.getElementById("pose").textContent = sel ?
+    selected + " (" + (sel.type || "?") + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) : "";
+}
+
+// ---- sprites: top-down, nose along +x, one function per kind (kinds.py) -----
+var SPRITES = { turtle: drawTurtle, lolibot: drawLoliBot, xgo: drawXGO, lekiwi: drawLeKiwi,
+                so101: drawSO101, drone: drawDrone, pi: drawPi, arrow: drawArrow };
+function drawSprite(kind, x, y, rad, c, col) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-rad);
+  (SPRITES[kind] || drawArrow)(c, col);
+  ctx.restore();
+}
+function rr(x, y, w, h, r, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); }
+function dot(x, y, r, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+function drawArrow(c, col) {
+  ctx.fillStyle = col; ctx.beginPath();
+  ctx.moveTo(18, 0); ctx.lineTo(-12, 11); ctx.lineTo(-6, 0); ctx.lineTo(-12, -11); ctx.closePath(); ctx.fill();
+}
+function drawTurtle(c, col) {
+  var skin = "#8fb55a";
+  [[-7, 12, 40], [7, 12, 140], [7, -12, -140], [-7, -12, -40]].forEach(function (l) {       // legs
+    ctx.save(); ctx.translate(l[0], l[1]); ctx.rotate(l[2] * Math.PI / 180);
+    rr(-3, -3, 12, 6, 3, skin); ctx.restore();
+  });
+  rr(-22, -2, 8, 4, 2, skin);                                                            // tail
+  dot(18, 0, 6, skin); dot(21, -2.5, 1.2, "#1c1c1e"); dot(21, 2.5, 1.2, "#1c1c1e");   // head
+  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;                    // shell
+  ctx.beginPath(); ctx.ellipse(0, 0, 16, 13, 0, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(0, 0, 8, 6, 0, 0, 7); ctx.stroke();
+  [0, 60, 120, 180, 240, 300].forEach(function (deg) {
+    var a = deg * Math.PI / 180; ctx.beginPath(); ctx.moveTo(8 * Math.cos(a), 6 * Math.sin(a)); ctx.lineTo(15 * Math.cos(a), 12 * Math.sin(a)); ctx.stroke();
+  });
+}
+// Stylised LoliBot (openhardwareconf.org): PCB chassis in the robot's
+// colour, yellow-hub wheels, red 18650 battery, ESP32, underglow
+function drawLoliBot(c, col) {
+  var glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 30);
+  glow.addColorStop(0, "rgba(62,207,142,0.45)"); glow.addColorStop(1, "rgba(62,207,142,0)");
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 30, 0, 7); ctx.fill();
+  function wheel(wy) { rr(-2, wy - 5, 22, 10, 5, "#1c1c1e"); rr(4, wy - 2, 10, 4, 2, "#f0b429"); }
+  wheel(-17); wheel(17);
+  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-16, -13); ctx.quadraticCurveTo(-21, 0, -16, 13); ctx.lineTo(8, 13);
+  ctx.quadraticCurveTo(22, 8, 25, 0); ctx.quadraticCurveTo(22, -8, 8, -13); ctx.closePath(); ctx.fill(); ctx.stroke();
+  rr(-2, -10, 6, 20, 3, "#c03535"); ctx.fillStyle = "#e8e2d4"; ctx.fillRect(-2, -10, 6, 2.5);
+  rr(-13, -6, 8, 12, 1.5, "#232323");
+  dot(18, 0, 1.8, "#ff5348");
+  ctx.fillStyle = "#cfcfcf"; ctx.strokeStyle = "#8a8a8a"; ctx.beginPath(); ctx.arc(-17, 0, 2.5, 0, 7); ctx.fill(); ctx.stroke();
+}
+// XGO: a quadruped seen from above, legs splayed, head with camera forward
+function drawXGO(c, col) {
+  [[10, 13, 25], [10, -13, -25], [-12, 13, 155], [-12, -13, -155]].forEach(function (l) {
+    ctx.save(); ctx.translate(l[0], l[1]); ctx.rotate(l[2] * Math.PI / 180);
+    rr(-2, -3, 13, 6, 3, "#3a3a3c"); dot(12, 0, 3, "#1c1c1e"); ctx.restore();
+  });
+  rr(-20, -2, 6, 4, 2, "#3a3a3c");                                                  // tail
+  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(-18, -9, 34, 18, 6); ctx.fill(); ctx.stroke();      // body
+  rr(12, -7, 14, 14, 4, "#2a2a2c");                                                 // head
+  dot(23, 0, 2.5, "#4fd1ff"); dot(22, -5, 1.2, "#ff5348"); dot(22, 5, 1.2, "#ff5348"); // camera, LEDs
+  rr(13, -11, 5, 3, 1, "#2a2a2c"); rr(13, 8, 5, 3, 1, "#2a2a2c");                   // ears
+}
+// LeKiwi: round omni base with three wheels at 120 degrees, SO-101 arm forward
+function drawLeKiwi(c, col) {
+  [90, 210, 330].forEach(function (deg) {
+    ctx.save(); ctx.rotate(deg * Math.PI / 180); rr(-5, 15, 10, 6, 2, "#1c1c1e"); ctx.restore();
+  });
+  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, 0, 16, 0, 7); ctx.fill(); ctx.stroke();
+  dot(0, 0, 4, "#2a2a2c");
+  arm(0, 0, 14, 12, "#e9e4d8");
+  dot(-9, 0, 2, "#4fd1ff");                                                          // camera
+}
+function arm(x, y, l1, l2, shade) {
+  ctx.strokeStyle = shade; ctx.lineCap = "round"; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + l1, y - 4); ctx.lineTo(x + l1 + l2, y); ctx.stroke();
+  ctx.lineWidth = 2.5; ctx.beginPath();
+  ctx.moveTo(x + l1 + l2, y - 4); ctx.lineTo(x + l1 + l2 + 6, y - 4); ctx.moveTo(x + l1 + l2, y + 4); ctx.lineTo(x + l1 + l2 + 6, y + 4); ctx.stroke();
+  dot(x, y, 3, "#5a5a5c"); dot(x + l1, y - 4, 2.5, "#5a5a5c");
+}
+// SO-101: an arm on a square base plate; it does not drive
+function drawSO101(c, col) {
+  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(-14, -14, 28, 28, 3); ctx.fill(); ctx.stroke();
+  [[-10, -10], [10, -10], [-10, 10], [10, 10]].forEach(function (p) { dot(p[0], p[1], 1.5, "#5a5a5c"); });
+  rr(-6, -6, 12, 12, 2, "#2a2a2c");
+  arm(0, 0, 14, 12, "#f0b429");
+}
+// Drone: X frame, four rotors, red nose
+function drawDrone(c, col) {
+  ctx.strokeStyle = "#3a3a3c"; ctx.lineWidth = 3; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-14, -14); ctx.lineTo(14, 14); ctx.moveTo(-14, 14); ctx.lineTo(14, -14); ctx.stroke();
+  [[14, 14], [14, -14], [-14, 14], [-14, -14]].forEach(function (p) {
+    ctx.strokeStyle = "rgba(120,120,120,0.55)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, 7); ctx.stroke();
+    dot(p[0], p[1], 2.5, "#1c1c1e");
+  });
+  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(-9, -6, 18, 12, 4); ctx.fill(); ctx.stroke();
+  dot(8, 0, 2, "#ff5348"); dot(-7, 0, 1.6, "#4fd1ff");
+}
+// Raspberry Pi: green board, small display, USB and Ethernet, GPIO header
+function drawPi(c, col) {
+  ctx.fillStyle = "#2f7d3a"; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(-17, -12, 34, 24, 2); ctx.fill(); ctx.stroke();
+  rr(-15, -10, 18, 20, 1, col); rr(-13, -8, 14, 16, 1, "#101418");                 // display
+  ctx.fillStyle = "#4fd1ff"; ctx.font = "7px 'IBM Plex Mono',monospace"; ctx.fillText("hi", -9, 2);
+  rr(6, -11, 5, 22, 1, "#1c1c1e"); for (var i = -9; i < 11; i += 3) dot(8.5, i, 0.7, "#f0b429"); // GPIO
+  rr(12, -10, 5, 8, 1, "#9a9a9a"); rr(12, 2, 5, 8, 1, "#9a9a9a");                  // USB, Ethernet
+  dot(-16, 9, 1.2, "#ff5348"); dot(-16, 6, 1.2, "#3ecf8e");                        // PWR, ACT
+}
+
+// ---- robots list ----------------------------------------------------------
+var list = document.getElementById("robots");
+function renderRobots() {
+  list.innerHTML = "";
+  Object.keys(robots).sort().forEach(function (name) {
+    var li = document.createElement("li");
+    li.className = name === selected ? "selected" : "";
+    var d = document.createElement("span"); d.className = "dot"; d.style.background = colorOf(name);
+    var label = document.createElement("span"); label.textContent = name;
+    var kind = document.createElement("span"); kind.className = "kind"; kind.textContent = robots[name].type || "";
+    var x = document.createElement("button"); x.className = "x"; x.type = "button"; x.title = "remove " + name; x.textContent = "×";
+    x.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (confirm("Remove robot " + name + "?")) api("/api/robots/" + name, "DELETE").then(function (res) {
+        if (!res.ok) document.getElementById("pose").textContent = "remove failed: " + explain(res);
+      });
+    });
+    li.append(d, label, kind, x);
+    li.addEventListener("click", function () { selected = name; renderRobots(); renderChips(); draw(); });
+    list.append(li);
+  });
+  renderChips();
+}
+document.getElementById("create").addEventListener("submit", function (e) {
+  e.preventDefault();
+  var name = document.getElementById("newname").value.trim();
+  api("/api/robots", "POST", { name: name, kind: kindSelect.value, owner: me() }).then(function (res) {
+    if (!res.ok) { document.getElementById("pose").textContent = "create failed: " + explain(res); return; }
+    selected = name; document.getElementById("newname").value = ""; renderRobots(); draw();
+  });
+});
+
+// ---- chat -------------------------------------------------------------------
+var messages = document.getElementById("messages"), channelSelect = document.getElementById("channel");
+var channel = load("turtle.channel", DEFAULT_CHANNEL), history = {};
+function renderChannels(info) {
+  var names = (info.known || []).slice();
+  if (names.indexOf(channel) < 0) names.push(channel);
+  names.sort(); channelSelect.innerHTML = "";
+  names.forEach(function (n) { var o = document.createElement("option"); o.value = n; o.textContent = n + (info.following && info.following.indexOf(n) >= 0 ? "" : " (not relayed yet)"); channelSelect.append(o); });
+  var other = document.createElement("option"); other.value = "__other__"; other.textContent = "other…"; channelSelect.append(other);
+  channelSelect.value = channel;
+}
+function refreshChannels() { return fetch("/api/chat/channels").then(function (r) { return r.json(); }).then(renderChannels); }
+refreshChannels();
+channelSelect.addEventListener("change", function () {
+  var pick = channelSelect.value;
+  if (pick === "__other__") { pick = (prompt("channel name") || "").trim().replace(/^#/, ""); if (!pick) { channelSelect.value = channel; return; } }
+  setChannel(pick);
+});
+function setChannel(name) {
+  channel = name; store("turtle.channel", channel);
+  api("/api/chat/channels", "POST", { channel: channel }).then(function (res) {
+    if (!res.ok) document.getElementById("chatstate").textContent = "cannot follow #" + channel + ": " + explain(res);
+    refreshChannels();
+  });
+  redrawMessages();
+}
+function redrawMessages() {
+  messages.innerHTML = "";
+  var list = history[channel] || [];
+  if (!list.length) { var e = document.createElement("li"); e.id = "empty"; e.textContent = "no messages yet in #" + channel; messages.append(e); }
+  list.forEach(showMessage);
+}
+function addMessage(m) {
+  var ch = m.channel || DEFAULT_CHANNEL;
+  (history[ch] = history[ch] || []).push(m);
+  if (history[ch].length > 300) history[ch].shift();
+  if (ch === channel) showMessage(m);
+}
+function showMessage(m) {
+  var empty = document.getElementById("empty"); if (empty) empty.remove();
+  var u = m.username || "?", text = (m.message || "").replace(/ !!!!$/, "");
+  var li = document.createElement("li");
+  li.className = u.startsWith("@@") ? "bot" : (u === me() ? "me" : "human");
+  var t = document.createElement("span"); t.className = "time"; t.textContent = new Date(m.timestamp * 1000).toLocaleTimeString();
+  var w = document.createElement("span"); w.className = "who"; w.textContent = u + ":";
+  var x = document.createElement("span"); x.textContent = text;
+  li.append(w, x, t); messages.append(li);
+  while (messages.children.length > 300) messages.firstChild.remove();
+  messages.scrollTop = messages.scrollHeight;
+}
+var hint = document.getElementById("hint"), hintTimer = null;
+function showHint(html) {
+  hint.innerHTML = html; hint.className = "show";
+  clearTimeout(hintTimer); hintTimer = setTimeout(function () { hint.className = ""; }, 20000);
+}
+function checkConventions(text) {
+  // Robots act only on messages that START with @@name; humans are @name.
+  var names = Object.keys(robots), first = text.split(/\s+/)[0] || "";
+  var bare = first.replace(/^@+/, "");
+  var isRobot = names.indexOf(bare) >= 0, isAgent = ("@@" + bare) === AGENT || bare === AGENT.replace(/^@+/, "");
+  if ((isRobot || isAgent) && !first.startsWith("@@")) {
+    showHint("Robots and agents only answer messages that <em>start</em> with a double at: <code>@@" + bare + " move 100</code>. Or ask the agent: <code>" + AGENT + " drive " + (isRobot ? bare : "a robot") + " in a square</code>.");
+    return;
+  }
+  if (!/@@/.test(text)) {
+    var mentioned = names.filter(function (n) { return text.indexOf(n) >= 0; })[0];
+    if (mentioned) showHint("Talking about <code>" + mentioned + "</code>? To drive it, start the message with <code>@@" + mentioned + "</code>, e.g. <code>@@" + mentioned + " turn 90</code> — or let <code>" + AGENT + "</code> do it: <code>" + AGENT + " make " + mentioned + " draw a square</code>.");
+  }
+}
+function send(text) {
+  text = text.trim(); if (!text) return;
+  checkConventions(text);
+  api("/api/chat", "POST", { message: text, username: me(), channel: channel }).then(function (res) {
+    if (!res.ok) document.getElementById("chatstate").textContent = "send failed: " + explain(res);
+  });
+}
+document.getElementById("send").addEventListener("submit", function (e) {
+  e.preventDefault(); var box = document.getElementById("text"); send(box.value); box.value = "";
+});
+var chips = document.getElementById("chips");
+function renderChips() {
+  chips.innerHTML = "";
+  var sel = robots[selected], kind = sel && KINDS[sel.type], allowed = kind ? kind.commands : null;
+  [["move 100", "move"], ["turn 90", "turn"], ["grasp", "grasp"], ["release", "release"], ["look", "look"], ["reset", "reset"], ["telemetry", "telemetry"]].forEach(function (cmd) {
+    var b = document.createElement("button"); b.type = "button"; b.textContent = cmd[0];
+    b.disabled = !!(allowed && allowed.indexOf(cmd[1]) < 0);
+    b.title = b.disabled ? "a " + sel.type + " has no " + cmd[1] : "send @@" + (selected || "robot") + " " + cmd[0];
+    b.addEventListener("click", function () {
+      if (!selected) { document.getElementById("pose").textContent = "select or create a robot first"; return; }
+      send("@@" + selected + " " + cmd[0]);
+    });
+    chips.append(b);
+  });
+  var ask = document.createElement("button"); ask.type = "button"; ask.textContent = AGENT + " draw a square";
+  ask.addEventListener("click", function () { send(AGENT + " draw a square" + (selected ? " with " + selected : "")); });
+  chips.append(ask);
+}
+renderChips();
+
+function setStatus(s) {
+  document.getElementById("world").textContent = s.world ? "live" : "waiting for world";
+  document.getElementById("chatstate").textContent = s.chat ? "connected" : "waiting for chat server";
+}
+var events = new EventSource("/events");
+events.onopen = function () { document.getElementById("status").textContent = "live — create a robot, then drive it from the chat, the REST API, or your own Aiko code (see the guide)"; };
+events.onerror = function () { document.getElementById("status").textContent = "reconnecting…"; };
+events.onmessage = function (message) {
+  var d = JSON.parse(message.data);
+  if (d.kind === "chat") { addMessage(d); return; }
+  if (d.kind === "status") { setStatus(d); return; }
+  if (d.kind === "robot_removed") { delete robots[d.name]; if (selected === d.name) selected = null; renderRobots(); draw(); return; }
+  if (d.kind !== "robot") return;
+  var r = robots[d.name];
+  if (!r) { r = robots[d.name] = { trail: [] }; if (!selected) selected = d.name; }
+  var changedKind = r.type !== d.type;
+  r.x = d.x; r.y = d.y; r.heading = d.heading; r.type = d.type;
+  if (changedKind) renderRobots();
+  var last = r.trail[r.trail.length - 1];
+  if (!last || last[0] !== d.x || last[1] !== d.y) r.trail.push([d.x, d.y]);
+  if (r.trail.length > 2000) r.trail.shift();
+  draw();
+};
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+draw();
+</script></body></html>

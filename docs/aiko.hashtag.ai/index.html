@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aiko.hashtag.ai</title>
+<meta name="description" content="A community MQTT broker and Aiko Services shared services for the Melbourne AI+ML+Robots community.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@500;600&display=swap">
+<style>
+:root{--bg:#f7f6f2;--surface:#ffffff;--ink:#1c2420;--muted:#5c6b62;--line:#d8ded9;--accent:#0b7a4b}
+@media (prefers-color-scheme:dark){:root{--bg:#101512;--surface:#182019;--ink:#e6ece7;--muted:#93a398;--line:#2a352c;--accent:#3ecf8e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:15px;line-height:1.7}
+main,footer{max-width:680px;margin:0 auto;padding:0 16px}
+main{padding-top:48px;padding-bottom:24px}
+header{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+h1{font-family:Sora,system-ui,sans-serif;font-weight:600;font-size:1.9rem;margin:0;letter-spacing:-.01em}
+h2{font-family:Sora,system-ui,sans-serif;font-weight:500;font-size:1.1rem;margin:32px 0 8px}
+p{margin:0 0 14px}
+a{color:var(--accent);text-underline-offset:3px}
+svg{flex:none;color:var(--accent)}
+pre{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:0 0 14px;font-size:13.5px;line-height:1.6}
+code{font-family:inherit}
+.note{border-left:3px solid var(--accent);padding-left:14px;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding-top:16px;padding-bottom:40px;color:var(--muted);font-size:13px}
+footer{max-width:648px}
+</style>
+</head>
+<body>
+<main>
+<header>
+<svg width="44" height="44" viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M22 4l15 9v18l-15 9-15-9V13z"/><circle cx="22" cy="22" r="3.5" fill="currentColor"/><path d="M22 18.5V4M25 24l12 7M19 24L7 31" stroke-linecap="round"/></svg>
+<h1>aiko.hashtag.ai</h1>
+</header>
+
+<p>Welcome. This server hosts a community MQTT broker and the Aiko Services &ldquo;shared services&rdquo; (Registrar, HyperSpace and ChatServer) for the Melbourne AI+ML+Robots community, so members can experiment with distributed robots and agents without running their own infrastructure.</p>
+
+<p class="note">It is hosted by Angie on Google Cloud as a volunteer effort. Please treat it as a hobby and community sandbox: there are no uptime promises, and you should not send any private data to it.</p>
+
+<h2>Connect</h2>
+<pre><code>export AIKO_MQTT_HOST=aiko.hashtag.ai
+
+aiko_registrar list
+aiko_dashboard
+
+mosquitto_sub -h aiko.hashtag.ai -t 'aiko/#' -v</code></pre>
+<p>The last command lets you watch the traffic. The broker is open, with no username or password. The ProcessManager runs in safe mode, so you can list services but not start or stop them.</p>
+
+<h2>Open source, with thanks</h2>
+<p>Aiko Services is open source: <a href="https://github.com/geekscape/aiko_services">github.com/geekscape/aiko_services</a>, along with Aiko Chat at <a href="https://github.com/geekscape/aiko_chat">github.com/geekscape/aiko_chat</a>. The framework and its design are the work of the Aiko Services author and the study group community. This server just gives their work a place to play.</p>
+
+<h2>Come along</h2>
+<p>Join us at the meetup: <a href="https://www.meetup.com/ai-ml-robots/">meetup.com/ai-ml-robots</a>, or see <a href="https://ai-ml-robots.github.io/">ai-ml-robots.github.io</a>. Everyone is welcome, beginners included.</p>
+</main>
+<footer>Hosted by Angie on Google Cloud &middot; an AI+ML+Robots community sandbox</footer>
+</body>
+</html>

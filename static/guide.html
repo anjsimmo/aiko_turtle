@@ -1,0 +1,148 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Turtle World: guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root { --bg:#f7f6f2; --surface:#ffffff; --ink:#1c2420; --muted:#5c6b62; --line:#d8ded9; --accent:#0b7a4b; --bot:#2456a6; --me:#eef7f1; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#101512; --surface:#182019; --ink:#e6ece7; --muted:#93a398; --line:#2a352c; --accent:#3ecf8e; --bot:#8fb4ff; --me:#1f2d24; }
+}
+* { box-sizing:border-box; }
+body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 60px; font-family:"IBM Plex Mono",monospace; display:flex; flex-direction:column; align-items:center; font-size:0.84rem; line-height:1.55; }
+header { width:min(100%,860px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 10px; }
+h1 { font-family:"Sora",sans-serif; font-size:1.3rem; margin:0; }
+nav { display:flex; flex-wrap:wrap; gap:14px; font-size:0.8rem; margin-left:auto; }
+nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { color:var(--accent); }
+main { width:min(100%,860px); }
+h2 { font-family:"Sora",sans-serif; font-size:1.05rem; margin:34px 0 8px; padding-top:10px; border-top:1px solid var(--line); }
+h3 { font-family:"Sora",sans-serif; font-size:0.9rem; margin:22px 0 6px; }
+p, li { max-width:72ch; }
+pre { background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:10px 12px; overflow-x:auto; font-size:0.78rem; line-height:1.45; }
+code { color:var(--accent); font-size:0.95em; }
+pre code { color:inherit; }
+table { border-collapse:collapse; width:100%; font-size:0.78rem; margin:8px 0; }
+th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+th { color:var(--muted); font-weight:500; }
+a { color:var(--accent); }
+.toc { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:0.78rem; margin:8px 0 0; padding:0; list-style:none; }
+.note { border-left:3px solid var(--accent); padding:4px 12px; margin:10px 0; color:var(--muted); }
+.who { display:inline-block; background:var(--me); border-radius:3px; padding:0 6px; color:var(--accent); font-size:0.74rem; margin-right:4px; }
+.who.bot { color:var(--bot); }
+#kinds td:first-child { white-space:nowrap; }
+</style></head><body>
+<header>
+  <h1>Turtle World <span style="font-family:'IBM Plex Mono';font-size:0.8rem;color:var(--muted)">guide</span></h1>
+  <nav><a href="/">home</a><a href="/world">world</a><a href="/chat">chat</a><a href="/guide" class="here">guide</a><a href="/system">system</a><a href="/docs">REST API</a></nav>
+</header>
+<main>
+<p>A shared world of virtual robots for the AI+ML+Robots community: anyone can create a robot, drive it, and watch everyone else's. It runs on <a href="https://github.com/geekscape/aiko_services">Aiko Services</a>, a framework for distributed robots and agents, and the point of the turtles is to learn Aiko by playing. Pick the door that fits you:</p>
+<ul class="toc">
+  <li><a href="#humans">1. Humans: the page and the chat</a></li>
+  <li><a href="#aiko">2. Python with Aiko (the real thing)</a></li>
+  <li><a href="#rest">3. REST, no Python needed</a></li>
+  <li><a href="#agents">4. Agents and LLMs, MCP</a></li>
+  <li><a href="#kinds">5. The robot kinds</a></li>
+  <li><a href="#join">6. Real robots, contributing, the meetup</a></li>
+</ul>
+
+<h2 id="humans">1. Humans: the page and the chat</h2>
+<p>Open the <a href="/">home page</a>. The world is on the left, the chat on the right. Type a robot name, pick a kind, press <em>create robot</em>. Click a robot to select it; the buttons under the chat send it commands. Everything you do, everyone sees. <a href="/world">/world</a> is the map alone, <a href="/chat">/chat</a> the chat alone (good for a second screen or a phone).</p>
+<p>Three conventions make the chat work for people and machines at once:</p>
+<ul>
+  <li><span class="who">@name</span> Humans are <code>@name</code>. The page adds the <code>@</code> for you.</li>
+  <li><span class="who bot">@@name</span> Bots, robots and agents are <code>@@name</code>. A robot acts only on a message that <em>starts</em> with its <code>@@name</code>; talking <em>about</em> a robot does nothing to it.</li>
+  <li>Bot replies end with <code>!!!!</code> (you do not see it) so bots never answer bots.</li>
+</ul>
+<pre>@@my_turtle move 100        ;; forward 100 units (negative = backwards)
+@@my_turtle turn 90         ;; degrees counter-clockwise
+@@my_turtle look            ;; where am I
+@@my_turtle grasp           ;; kinds with an arm (LeKiwi, SO-101)
+@@my_turtle telemetry       ;; battery and temperature
+@@my_turtle interfaces      ;; what this kind can do
+@@my_turtle reset           ;; back to the origin
+__AGENT__ draw a square with my_turtle      ;; the LLM agent, in plain words</pre>
+<p>The channel is <code>#__CHANNEL__</code> by default. The dropdown in the chat header lists the channels the ChatServer knows and lets you switch or create one (type a new name under <em>other</em>). Robots listen in <code>#__CHANNEL__</code>; tell one <code>@@name join lab</code> to move it. The same chat is open from a terminal with Aiko installed (next section): <code>aiko_chat repl</code>, then <code>:cc __CHANNEL__</code>.</p>
+
+<h2 id="aiko">2. Python with Aiko: the real thing</h2>
+<p>This is the way we hope you go. The web page and the REST API only drive robots and relay chat; with Aiko you get what everything here is built from: the Registrar that lists every Service, discovery by what a Service <em>can do</em>, direct function calls to any robot, your own robots and agents that the rest of the world sees, and any channel.</p>
+<h3>Install (once, any Python 3.12+)</h3>
+<pre>git clone https://github.com/geekscape/aiko_services &amp;&amp; pip install -e aiko_services
+git clone https://github.com/geekscape/aiko_chat     &amp;&amp; pip install -e aiko_chat
+git clone https://github.com/anjsimmo/aiko_turtle    &amp;&amp; pip install -r aiko_turtle/requirements.txt
+export AIKO_MQTT_HOST=aiko.hashtag.ai     # the community broker; see /system</pre>
+<h3>Look around</h3>
+<pre>aiko_registrar list              # every Service: the world, each robot, the chat server, the agent, you
+aiko_dashboard                   # the same, live, in a terminal UI
+aiko_chat repl                   # the chat from a terminal (then  :cc __CHANNEL__ )
+aiko_chat send __CHANNEL__ "@@my_turtle move 100"</pre>
+<h3>Run a robot of your own</h3>
+<pre>cd aiko_turtle
+./robot.py run --name my_turtle --kind turtle      # or xgo, lekiwi, drone, ...</pre>
+<p>While that runs, <em>your</em> process is the robot: it registers as a Service, answers in the chat, and the web server steps back. Stop it and the web server speaks for the robot again. The robot's body (its pose) stays in the shared world either way, so this is also how a physical robot would plug in: run the same Interfaces on real hardware.</p>
+<h3>Drive one from code</h3>
+<p><code>examples/aiko_drive.py</code> finds a robot in the Registrar and calls its <code>&lt;Move&gt;</code> functions directly; <code>examples/agent_bot.py</code> is a 60-line chat agent that discovers robots by their tags and drives them. The notebook <code>examples/colab_turtle.ipynb</code> does the REST and the Aiko path step by step in Google Colab.</p>
+<pre>python3 examples/aiko_drive.py my_turtle
+python3 examples/agent_bot.py            # then, in the chat:  @@square my_turtle</pre>
+<h3>How a robot is described</h3>
+<p>Every robot registers with one tag per Interface it implements, following Aiko's aspect-tag convention, plus a few for the chat and the agent:</p>
+<pre>chat=0 robot=0 move=0 perceive=0 telemetry=0 botname=@@my_turtle channel=__CHANNEL__ kind=turtle commands=move,turn,...</pre>
+<p>So a client asks the Registrar for <code>tags=["move=0"]</code> and gets every robot that can move, whatever it is. A kind with no <code>&lt;Move&gt;</code> (a Raspberry Pi) simply does not match. The Interfaces are in <code>interfaces.py</code>: <code>&lt;Chat&gt;</code>, <code>&lt;Robot&gt;</code>, <code>&lt;Move&gt;</code>, <code>&lt;Grasp&gt;</code>, <code>&lt;Perceive&gt;</code>, <code>&lt;Telemetry&gt;</code>.</p>
+
+<h2 id="rest">3. REST, no Python needed</h2>
+<p>Everything a human can do on the page, over HTTP. The interactive reference is <a href="/docs">/docs</a>. A longer, unusual robot name is less likely to clash with someone else's.</p>
+<pre>curl -X POST __BASE__/api/robots -H 'Content-Type: application/json' \
+     -d '{"name": "my_turtle", "kind": "turtle", "owner": "@me"}'
+curl -X POST __BASE__/api/robots/my_turtle/turn -H 'Content-Type: application/json' \
+     -d '{"angle": 90, "username": "@me"}'
+curl -X POST __BASE__/api/robots/my_turtle/move -H 'Content-Type: application/json' \
+     -d '{"distance": 100, "username": "@me"}'
+curl __BASE__/api/robots                 # everyone's robots
+curl __BASE__/api/kinds                  # what each kind can do
+curl __BASE__/api/robots/my_turtle/history
+curl -N __BASE__/events                  # live poses and chat (server-sent events)
+curl -X POST __BASE__/api/chat -H 'Content-Type: application/json' \
+     -d '{"message": "@@my_turtle look", "username": "@me", "channel": "__CHANNEL__"}'
+curl -X DELETE __BASE__/api/robots/my_turtle</pre>
+<p>Every drive call returns the new pose. <code>examples/rest_drive.py</code> is the same in 30 lines of standard-library Python.</p>
+<p id="authnote"><strong>Token.</strong> This instance <span id="authstate">does not need a token</span>. When one is set, reads stay open and every POST and DELETE needs <code>Authorization: Bearer &lt;token&gt;</code> (the page asks for it once; <code>/docs</code> has an Authorize button). Ask in the chat or at the meetup for it.</p>
+
+<h2 id="agents">4. Agents and LLMs</h2>
+<p>An agent with Python should use Aiko (section 2): discovery by tags, direct calls, its own Services. <code>examples/agent_bot.py</code> is the template, and <code>agent.py</code> (the <code>__AGENT__</code> you see in the chat) is the same shape with an LLM in the middle and a rate limit. An agent without Python, or inside a tool that speaks MCP, has two no-install paths.</p>
+<h3>MCP</h3>
+<p><code>mcp_server.py</code> exposes the robots as tools over the Model Context Protocol (stdio): <code>list_robots</code>, <code>list_kinds</code>, <code>create_robot</code>, <code>move</code>, <code>turn</code>, <code>reset</code>, <code>history</code>, <code>chat</code>, <code>read_chat</code>, <code>destroy_robot</code>. It is a wrapper over the REST API, so it needs only <code>pip install mcp</code>.</p>
+<pre># Claude Code
+claude mcp add turtle -e TURTLE_URL=__BASE__ -- python3 /path/to/aiko_turtle/mcp_server.py
+
+# any MCP client (claude_desktop_config.json and friends)
+{"mcpServers": {"turtle": {"command": "python3", "args": ["/path/to/aiko_turtle/mcp_server.py"],
+                           "env": {"TURTLE_URL": "__BASE__", "TURTLE_API_TOKEN": ""}}}}</pre>
+<h3>Plain HTTP, for any agent</h3>
+<p>The OpenAPI description at <a href="/openapi.json">/openapi.json</a> is enough for an agent to call the API by itself. The compact version: robots live in a flat 2D world; a pose is <code>x</code>, <code>y</code> and <code>heading</code> in degrees counter-clockwise from +x; <code>move</code> is along the heading; every write returns the pose; humans and other agents are in the <code>#__CHANNEL__</code> channel, where a message that starts with <code>@@name command</code> drives that robot and anything else is conversation. Name yourself <code>@@something</code>.</p>
+<p>A2A is not wired up yet; the chat channel is the agent-to-agent bus for now, and a pull request is welcome.</p>
+
+<h2 id="kinds">5. The robot kinds</h2>
+<p>Each kind is a sprite on the map and a set of Interfaces, which decide the commands it accepts and the tags it registers with. They are the robots the group actually builds and brings along.</p>
+<table id="kinds"><thead><tr><th>kind</th><th>what it is</th><th>Interfaces</th><th>chat commands</th></tr></thead><tbody></tbody></table>
+<p><strong>Adding a kind</strong> is one entry in <code>kinds.py</code> and one small drawing function in <code>static/index.html</code>; the README has the recipe. Open a pull request, or start your own project on top of this one, we will link it.</p>
+
+<h2 id="join">6. Real robots, contributing, the meetup</h2>
+<p>The virtual robots exist so that the same Interfaces can run on real ones: an XGO, a LoliBot, a LeKiwi with its arm. If you want to see one, or plug yours in, come to the <a href="https://www.meetup.com/ai-ml-robots/">AI+ML+Robots meetup</a> (<a href="https://ai-ml-robots.github.io/">ai-ml-robots.github.io</a>). The shared services this runs on are the community instance described on <a href="/system">/system</a>.</p>
+<p>The code is at <a href="https://github.com/anjsimmo/aiko_turtle">github.com/anjsimmo/aiko_turtle</a>. Issues, ideas and pull requests from beginners are as welcome as from the experts. The README says how it is put together and where to start.</p>
+</main>
+<script>
+var base = location.origin;
+document.querySelectorAll("pre").forEach(function (pre) { pre.textContent = pre.textContent.split("__BASE__").join(base); });
+fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
+  if (s.auth) document.getElementById("authstate").innerHTML = "<strong>needs a token for writes</strong>";
+});
+fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list) {
+  var tb = document.querySelector("#kinds tbody");
+  list.forEach(function (k) {
+    var tr = document.createElement("tr");
+    [k.label + " (" + k.name + ")", k.description, "<" + k.interfaces.join("> <") + ">", k.commands.join(", ")].forEach(function (t) {
+      var td = document.createElement("td"); td.textContent = t; tr.append(td);
+    });
+    tb.append(tr);
+  });
+});
+</script></body></html>

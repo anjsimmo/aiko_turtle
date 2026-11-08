@@ -19,6 +19,7 @@ def env(name, default):
 
 # Aiko shared services (the defaults are the community instance)
 AIKO_MQTT_HOST = env("AIKO_MQTT_HOST", "aiko.hashtag.ai")
+AIKO_MQTT_PORT = int(env("AIKO_MQTT_PORT", "1883"))
 AIKO_NAMESPACE = env("AIKO_NAMESPACE", "aiko")
 
 # The world: one VirtualWorld Service holds every robot's pose
@@ -36,6 +37,9 @@ AGENT_BOTNAME = env("TURTLE_AGENT", "@@pilot")
 WEB_HOST = env("TURTLE_WEB_HOST", "127.0.0.1")
 WEB_PORT = int(env("TURTLE_WEB_PORT", "8123"))
 WEB_USERNAME = env("TURTLE_USERNAME", os.environ.get("USER", "anonymous"))
+# Empty = open.  Set it and every POST/DELETE on the REST API needs
+# "Authorization: Bearer <token>" (the page asks for it once)
+API_TOKEN = env("TURTLE_API_TOKEN", "")
 
 # LLM ChatAgent
 OPENAI_API_KEY = env("OPENAI_API_KEY", "")

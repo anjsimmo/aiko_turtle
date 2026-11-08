@@ -22,6 +22,7 @@ import uvicorn
 
 import aiko_services as aiko
 from aiko_services.main.actor import ActorTopic
+from aiko_services.main.share import services_cache_create_singleton
 from aiko_services.main.utilities import parse
 from aiko_chat import ChatServer, get_server_service_filter
 from aiko_chat.protocol import _decode_message
@@ -48,7 +49,10 @@ class AikoBackend(aiko.Actor):
         self.world_topic = None
         self.ec_consumer = None
         self.chat_server = None
-        self.chat_topic = None
+        self.chat_topic = None          # the ChatServer's topic path
+        self.followed = {channel}       # channels relayed to the page
+        self.chat_share = {}            # the ChatServer's share (channel_list)
+        self.chat_consumer = None
         self.hosted = {}            # robot name -> ChatRobotAgent (ours)
         self.external = set()       # robots with their own live process
         self.kinds = {}             # robot name -> kind, from the share
@@ -229,10 +233,52 @@ class AikoBackend(aiko.Actor):
                  "x": float(row[5]), "y": float(row[6]),
                  "heading": float(row[7])} for row in rows]
 
-    def send_chat(self, username, message):
+    def send_chat(self, username, message, channel=None):
         if not self.chat_server:
             raise BackendError(503, "chat server not connected")
-        self.chat_server.send_message(username, [self.channel], message)
+        channel = channel or self.channel
+        self.follow_channel(channel)
+        self.chat_server.send_message(username, [channel], message)
+
+    def channels(self):
+        known = self.chat_share.get("channel_list", [])
+        if isinstance(known, dict):
+            known = list(known)
+        elif not isinstance(known, (list, tuple)):
+            known = [str(known)]
+        return {"default": self.channel, "following": sorted(self.followed),
+                "known": sorted({str(name) for name in known} | self.followed)}
+
+    def follow_channel(self, channel):
+        if channel not in self.followed:
+            self.followed.add(channel)
+            if self.chat_topic:
+                self.add_message_handler(
+                    self._chat_handler, f"{self.chat_topic}/{channel}")
+            print(f"WEB: following #{channel}", flush=True)
+        return self.channels()
+
+    def system(self):
+        """The shared services, for /system: what a newcomer needs to
+        connect by MQTT, and the Registrar's view of who is running"""
+        cache = services_cache_create_singleton(aiko.process)
+        services = []
+        for details in cache.get_services():
+            topic_path, name, protocol, transport, owner, tags = details[:6]
+            services.append({
+                "topic_path": topic_path, "name": name, "protocol": protocol,
+                "transport": transport, "owner": owner,
+                "tags": [str(tag) for tag in (tags or [])]})
+        services.sort(key=lambda service: service["topic_path"])
+        return {
+            "mqtt": {"host": config.AIKO_MQTT_HOST, "port": config.AIKO_MQTT_PORT,
+                     "namespace": config.AIKO_NAMESPACE,
+                     "registrar_topic": f"{config.AIKO_NAMESPACE}/service/registrar",
+                     "chat_server_topic": self.chat_topic,
+                     "world_topic": self.world_topic},
+            "cache_state": cache.get_state(),
+            "services": services,
+            "channels": self.channels()}
 
     # -- hosting ChatRobotAgents for REST-created robots (Actor thread) ----
 
@@ -266,17 +312,34 @@ class AikoBackend(aiko.Actor):
 
     def _chat_add_handler(self, service_details, service):
         print(f"WEB: chat server connected: {service_details[0]}", flush=True)
+        self._chat_detach()
         self.chat_server = service
-        if self.chat_topic:
-            self.remove_message_handler(self._chat_handler, self.chat_topic)
-        self.chat_topic = f"{service_details[0]}/{self.channel}"
-        self.add_message_handler(self._chat_handler, self.chat_topic)
+        self.chat_topic = service_details[0]
+        for channel in self.followed:
+            self.add_message_handler(
+                self._chat_handler, f"{self.chat_topic}/{channel}")
+        self.chat_consumer = aiko.ECConsumer(
+            self, 1, self.chat_share, f"{self.chat_topic}/control")
         self.hub.set_status(chat=service_details[0])
 
     def _chat_remove_handler(self, service_details):
+        if service_details[0] != self.chat_topic:
+            return
         print("WEB: chat server disconnected", flush=True)
-        self.chat_server = None
+        self._chat_detach()
         self.hub.set_status(chat=None)
+
+    def _chat_detach(self):
+        if self.chat_topic:
+            for channel in self.followed:
+                self.remove_message_handler(
+                    self._chat_handler, f"{self.chat_topic}/{channel}")
+        if self.chat_consumer:
+            self.chat_consumer.terminate()
+        self.chat_consumer = None
+        self.chat_server = None
+        self.chat_topic = None
+        self.chat_share.clear()
 
     def _chat_handler(self, _aiko, topic, payload_in):
         fields = _decode_message(payload_in)
@@ -286,10 +349,11 @@ class AikoBackend(aiko.Actor):
             timestamp = float(fields.get("timestamp", time.time()))
         except (TypeError, ValueError):
             timestamp = time.time()
+        channel = str(fields.get("channel") or topic.rsplit("/", 1)[-1])
         self.hub.publish_chat({
             "username": str(fields.get("username", "") or ""),
             "message": str(fields.get("message", "")),
-            "timestamp": timestamp})
+            "channel": channel, "timestamp": timestamp})
 
 
 @click.command()
@@ -303,6 +367,9 @@ def main(host, port, channel, world_name):
     init_args.update({"world_name": world_name, "channel": channel})
     backend = aiko.compose_instance(AikoBackend, init_args)
     app = create_app(backend, channel=channel)
+    if config.API_TOKEN:
+        print("WEB: REST writes need the bearer token (TURTLE_API_TOKEN)",
+              flush=True)
 
     server = uvicorn.Server(uvicorn.Config(
         app, host=host, port=port, log_level="warning"))

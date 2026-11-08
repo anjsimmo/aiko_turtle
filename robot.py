@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 #
 # ChatRobotAgent: one virtual robot, as an Aiko Actor implementing the
-# <Chat> and <Robot> Interfaces (<Robot> composed of <Move>, <Perceive>
-# and <Telemetry>).  Its body lives in the VirtualWorld; this Actor is
-# the robot's voice in the chat and its entry in the Registrar.
+# <Chat> and <Robot> Interfaces (<Robot> composed of <Move>, <Grasp>,
+# <Perceive> and <Telemetry>, as the robot's kind allows: kinds.py).  Its
+# body lives in the VirtualWorld; this Actor is the robot's voice in the
+# chat and its entry in the Registrar.
 #
 # Anyone can run one, from anywhere, against the shared services:
 #
 #   source env.sh
-#   ./robot.py run --name my_turtle [--kind turtle|arrow] [--channel robots]
+#   ./robot.py run --name my_turtle [--kind turtle|xgo|...] [--channel robots]
 #
 # then, in the channel:  @@my_turtle move 100
 #
 # The web server (web.py) hosts a ChatRobotAgent in its own process for
 # every robot created through the REST API, with host_robot().
 #
-# Chat commands: move D, turn A, stop, reset, look, telemetry, interfaces,
-# join CHANNEL.  Only messages STARTING with "@@name" are commands.
+# Chat commands: move D, turn A, stop, reset, grasp, release, look,
+# telemetry, interfaces, join CHANNEL (those the kind supports).  Only
+# messages STARTING with "@@name" are commands.
 
 import click
 
@@ -29,25 +31,27 @@ import aiko_chat.bot as bot
 from aiko_chat.protocol import _decode_message
 
 import config
-from core import COMMAND_NAMES, parse_command
+from core import parse_command
 from interfaces import (
-    Chat, Move, Perceive, Robot, Telemetry, aspect_tags, interface_names,
+    Chat, Grasp, Move, Perceive, Robot, Telemetry, aspect_tags,
 )
+from kinds import DEFAULT_KIND, KINDS, kind_commands, kind_interfaces, supports
 from virtual_world import VirtualWorld
 
 ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"
 ACK_SUFFIX = " !!!!"            # loop-prevention convention, see aiko_chat.bot
 
 
-class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Perceive, Telemetry):
+class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry):
     def __init__(self, context, robot_name, channel=config.CHANNEL,
-                 world_name=config.WORLD_NAME, kind="turtle",
+                 world_name=config.WORLD_NAME, kind=DEFAULT_KIND,
                  owner="anonymous", host="external"):
         context.call_init(self, "ChatBot", context)
         self.robot_name = robot_name
         self.botname = f"@@{robot_name}"
         self.current_channel = channel
-        self.kind = kind
+        self.kind = kind if kind in KINDS else DEFAULT_KIND
+        self.gripper = "open"       # <Grasp> state (virtual: no world needed)
         self.owner = owner
         self.host = host
         self.share["source_file"] = __file__
@@ -134,6 +138,16 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Perceive, Telemetry):
         return self._with_world(lambda world: world.reset(
             self.robot_name, username, self.world_response_topic))
 
+    # -- <Grasp> -------------------------------------------------------------
+
+    def grasp(self):
+        self.gripper = "closed"
+        return "gripper closed"
+
+    def release(self):
+        self.gripper = "open"
+        return "gripper open"
+
     # -- <Perceive> ----------------------------------------------------------
 
     def snapshot(self, topic_path_response=None):
@@ -153,7 +167,7 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Perceive, Telemetry):
     # -- <Robot> -------------------------------------------------------------
 
     def get_interfaces(self, topic_path_response=None):
-        names = interface_names(self)
+        names = ["Chat", "Robot", *kind_interfaces(self.kind)]
         if topic_path_response:
             aiko.process.message.publish(
                 topic_path_response, f"(item_count {len(names)})")
@@ -199,6 +213,9 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Perceive, Telemetry):
     def run_command(self, chat_command, username="anonymous"):
         """Returns the immediate reply, or None when the world will reply"""
         method, arguments = parse_command(chat_command)
+        if method and not supports(self.kind, method):
+            return (f"a {self.kind} cannot {method}: its commands are "
+                    f"{', '.join(kind_commands(self.kind))}")
         match method:
             case "move":
                 return self.move(arguments[0], username)
@@ -208,6 +225,10 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Perceive, Telemetry):
                 return self.stop()
             case "reset":
                 return self.reset(username)
+            case "grasp":
+                return self.grasp()
+            case "release":
+                return self.release()
             case "look":
                 return self.snapshot()
             case "telemetry":
@@ -250,12 +271,14 @@ def _pose_words(fields):
 
 
 def robot_tags(robot_name, channel, kind):
-    return ["ec=true", "type=chat_robot", *aspect_tags(ChatRobotAgent),
+    """Aspect tags per ADR-025: one per Interface this robot implements"""
+    interfaces = ["Chat", "Robot", *kind_interfaces(kind)]
+    return ["ec=true", "type=chat_robot", *aspect_tags(interfaces),
             f"botname=@@{robot_name}", f"channel={channel}", f"kind={kind}",
-            f"commands={COMMAND_NAMES}"]
+            f"commands={','.join(kind_commands(kind))}"]
 
 
-def host_robot(robot_name, kind="turtle", owner="anonymous",
+def host_robot(robot_name, kind=DEFAULT_KIND, owner="anonymous",
                channel=config.CHANNEL, world_name=config.WORLD_NAME,
                host="external"):
     """Create the ChatRobotAgent Actor in this process and return it"""
@@ -279,8 +302,8 @@ def main():
 @main.command(name="run")
 @click.option("--name", "robot_name", type=str, required=True,
     help="robot name; also its chat mention @@NAME")
-@click.option("--kind", type=click.Choice(["turtle", "arrow"]),
-    default="turtle", show_default=True)
+@click.option("--kind", type=click.Choice(list(KINDS)),
+    default=DEFAULT_KIND, show_default=True)
 @click.option("--owner", type=str, default=config.WEB_USERNAME,
     show_default=True)
 @click.option("--channel", type=str, default=config.CHANNEL, show_default=True)

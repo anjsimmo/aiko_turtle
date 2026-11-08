@@ -7,6 +7,7 @@ def test_parse_command():
     assert parse_command("home") == ("reset", [])
     assert parse_command("battery") == ("telemetry", [])
     assert parse_command("join lab") == ("join", ["lab"])
+    assert parse_command("grab") == ("grasp", [])
     method, error = parse_command("move 1 2")
     assert method is None and "unknown command" in error
     assert parse_command("")[0] is None
@@ -42,3 +43,11 @@ def test_valid_robot_name():
     assert not valid_robot_name("_leading")
     assert not valid_robot_name("has space")
     assert not valid_robot_name("a" * 65)
+
+
+def test_kinds():
+    from kinds import KINDS, kind_commands, supports
+    assert set(KINDS) >= {"turtle", "lolibot", "xgo", "lekiwi", "so101", "drone", "pi"}
+    assert supports("turtle", "move") and not supports("pi", "move")
+    assert supports("so101", "grasp") and not supports("turtle", "grasp")
+    assert kind_commands("pi") == ["look", "telemetry", "interfaces", "join"]

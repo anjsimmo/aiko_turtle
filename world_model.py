@@ -5,8 +5,7 @@
 import math
 
 from db import Database
-
-KINDS = ("turtle", "arrow")       # sprites the web page knows how to draw
+from kinds import KINDS
 
 
 class WorldError(Exception):
@@ -35,7 +34,7 @@ class World:
         if name in self.robots:
             return dict(self.robots[name])
         if kind not in KINDS:
-            raise WorldError(f"unknown kind {kind}: choose from {KINDS}")
+            raise WorldError(f"unknown kind {kind}: choose from {', '.join(KINDS)}")
         record = {"name": name, "kind": kind, "owner": owner, "host": host,
                   "x": 0.0, "y": 0.0, "heading": 0.0}
         self.robots[name] = record

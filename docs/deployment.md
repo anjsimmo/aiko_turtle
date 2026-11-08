@@ -79,7 +79,13 @@ cp .env.example .env
 ```bash
 TURTLE_USERNAME=web               # chat name the web server speaks under
 OPENAI_API_KEY=sk-...             # optional; without it the agent needs the claude CLI
+#TURTLE_API_TOKEN=TURTLES_ALL_THE_WAY_DOWN   # optional: then POST/DELETE need a bearer token
 ```
+
+With `TURTLE_API_TOKEN` set, reads and the pages stay open but every
+request that changes something (create, drive, delete, chat) needs
+`Authorization: Bearer <token>`; the page asks for it once and keeps it
+in the browser. Leave it unset for an open sandbox.
 
 Everything else keeps its default. `TURTLE_WEB_HOST` stays
 `127.0.0.1`: the web server is only ever reached through nginx. The
@@ -216,6 +222,38 @@ is added. It also installs `certbot.timer`, which renews the certificate
 automatically (`systemctl is-active certbot.timer`). Ports 80 and 443
 must be open in the host's firewall; on GCP that is the `http-server`
 and `https-server` network tags on the instance.
+
+## 4b. The landing page at aiko.hashtag.ai
+
+The bare host name gets a one-page static site that says what the server
+is (a community broker, who hosts it, how to connect, the meetup) and
+deliberately does not link to the applications on subdomains. The page
+is `docs/aiko.hashtag.ai/index.html` in this repository, so it is
+updated like everything else: `git pull`, then nginx serves it straight
+from the clone.
+
+```bash
+sudo tee /etc/nginx/sites-available/aiko.hashtag.ai > /dev/null <<'NGINX'
+# aiko.hashtag.ai: static landing page from the aiko_turtle clone
+server {
+    listen 80;
+    listen [::]:80;
+    server_name aiko.hashtag.ai;
+    root /home/anj/projects/aiko_turtle/docs/aiko.hashtag.ai;
+    index index.html;
+    location / { try_files $uri $uri/ =404; }
+}
+NGINX
+sudo ln -s /etc/nginx/sites-available/aiko.hashtag.ai /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default        # it was the catch-all until now
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d aiko.hashtag.ai
+```
+
+nginx runs as `www-data`, so the clone's directory path must be readable
+by it (`chmod o+x /home/anj` if the home directory is `750`). The MQTT
+broker on the same host is untouched: port 1883 is Mosquitto, ports 80
+and 443 are nginx.
 
 ## 5. DNS
 
