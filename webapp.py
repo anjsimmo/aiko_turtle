@@ -6,6 +6,7 @@
 # fake one.  Interactive API docs are served at /docs; the pages are the
 # files in static/.
 
+import asyncio
 import json
 import queue
 import threading
@@ -110,8 +111,9 @@ class EventHub:
             status = dict(self.status)
         self._broadcast(status)
 
-    def subscribe(self):
-        client = queue.Queue()
+    def subscribe(self, client=None):
+        """client: anything with put(event); default a queue.Queue"""
+        client = client if client is not None else queue.Queue()
         with self.lock:
             replay = [dict(self.status)]
             for trail in self.trails.values():
@@ -124,6 +126,18 @@ class EventHub:
     def unsubscribe(self, client):
         with self.lock:
             self.clients.discard(client)
+
+
+class _AsyncClient:
+    """An EventHub client for the async SSE route: the hub puts events
+    from Aiko's threads, the route awaits them on the event loop"""
+
+    def __init__(self, loop):
+        self.loop = loop
+        self.queue = asyncio.Queue()
+
+    def put(self, event):
+        self.loop.call_soon_threadsafe(self.queue.put_nowait, event)
 
 
 # -- request / response models -------------------------------------------------
@@ -242,19 +256,25 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         return static_page("system.html")
 
     @app.get("/events", include_in_schema=False)
-    def events(request: Request):
+    async def events(request: Request):
+        # Async on purpose: a browser holds one HTTP connection per open
+        # tab for this stream (and allows about six per host), so a closed
+        # tab must be noticed at once.  Starlette cancels an async
+        # generator the moment the client goes away; a blocking one would
+        # sit in a worker thread until its next keepalive
         hub = backend.hub
-        client, replay = hub.subscribe()
+        client = _AsyncClient(asyncio.get_running_loop())
+        _, replay = hub.subscribe(client)
 
-        def stream():
+        async def stream():
             try:
                 for event in replay:
                     yield f"data: {json.dumps(event)}\n\n"
-                while True:
+                while not await request.is_disconnected():
                     try:
-                        event = client.get(timeout=15)
+                        event = await asyncio.wait_for(client.queue.get(), 15)
                         yield f"data: {json.dumps(event)}\n\n"
-                    except queue.Empty:
+                    except asyncio.TimeoutError:
                         yield ": keepalive\n\n"
             finally:
                 hub.unsubscribe(client)
@@ -265,7 +285,8 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
     @app.get("/api/status", tags=["world"])
     def status():
         return dict(call(backend.status), auth=bool(api_token),
-                    channel=channel, agent=agent)
+                    channel=channel, agent=agent,
+                    streams=len(backend.hub.clients))
 
     @app.get("/api/kinds", tags=["robots"])
     def list_kinds():

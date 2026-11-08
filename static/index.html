@@ -470,25 +470,41 @@ function setStatus(s) {
   document.getElementById("world").textContent = s.world ? "live" : "waiting for world";
   document.getElementById("chatstate").textContent = s.chat ? "connected" : "waiting for chat server";
 }
-var events = new EventSource("/events");
-events.onopen = function () { document.getElementById("status").textContent = "live — create a robot, then drive it from the chat, the REST API, or your own Aiko code (see the guide)"; };
-events.onerror = function () { document.getElementById("status").textContent = "reconnecting…"; };
-events.onmessage = function (message) {
-  var d = JSON.parse(message.data);
-  if (d.kind === "chat") { addMessage(d); return; }
-  if (d.kind === "status") { setStatus(d); return; }
-  if (d.kind === "robot_removed") { delete robots[d.name]; if (selected === d.name) selected = null; renderRobots(); draw(); return; }
-  if (d.kind !== "robot") return;
-  var r = robots[d.name];
-  if (!r) { r = robots[d.name] = { trail: [] }; if (!selected) selected = d.name; }
-  var changedKind = r.type !== d.type;
-  r.x = d.x; r.y = d.y; r.heading = d.heading; r.type = d.type;
-  if (changedKind) renderRobots();
-  var last = r.trail[r.trail.length - 1];
-  if (!last || last[0] !== d.x || last[1] !== d.y) r.trail.push([d.x, d.y]);
-  if (r.trail.length > 2000) r.trail.shift();
-  draw();
-};
+// One live stream per visible tab.  A hidden tab closes its stream (a
+// browser allows only ~6 connections per host, and every open tab with a
+// stream holds one) and rebuilds its state from the replay when shown.
+var events = null;
+function connect() {
+  if (events) return;
+  robots = {}; history = {}; selected = null; renderRobots(); redrawMessages(); draw();
+  events = new EventSource("/events");
+  events.onopen = function () { document.getElementById("status").textContent = "live \u2014 create a robot, then drive it from the chat, the REST API, or your own Aiko code (see the guide)"; };
+  events.onerror = function () { document.getElementById("status").textContent = "reconnecting\u2026"; };
+  events.onmessage = function (message) {
+    var d = JSON.parse(message.data);
+    if (d.kind === "chat") { addMessage(d); return; }
+    if (d.kind === "status") { setStatus(d); return; }
+    if (d.kind === "robot_removed") { delete robots[d.name]; if (selected === d.name) selected = null; renderRobots(); draw(); return; }
+    if (d.kind !== "robot") return;
+    var r = robots[d.name];
+    if (!r) { r = robots[d.name] = { trail: [] }; if (!selected) selected = d.name; }
+    var changedKind = r.type !== d.type;
+    r.x = d.x; r.y = d.y; r.heading = d.heading; r.type = d.type;
+    if (changedKind) renderRobots();
+    var last = r.trail[r.trail.length - 1];
+    if (!last || last[0] !== d.x || last[1] !== d.y) r.trail.push([d.x, d.y]);
+    if (r.trail.length > 2000) r.trail.shift();
+    draw();
+  };
+}
+function disconnect() {
+  if (!events) return;
+  events.close(); events = null;
+  document.getElementById("status").textContent = "paused while hidden";
+}
+document.addEventListener("visibilitychange", function () { if (document.hidden) disconnect(); else connect(); });
+window.addEventListener("pagehide", disconnect);
+connect();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
 draw();
 </script></body></html>

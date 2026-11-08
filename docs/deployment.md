@@ -218,7 +218,12 @@ sudo certbot --nginx -d turtle.aiko.hashtag.ai
 `certbot --nginx` rewrites the file in place: the `server` block above
 becomes the `listen 443 ssl` one, with the certificate lines marked
 `# managed by Certbot`, and a new port-80 block that redirects to HTTPS
-is added. It also installs `certbot.timer`, which renews the certificate
+is added. Then **turn on HTTP/2** on that block, which certbot does not
+do: change `listen 443 ssl;` to `listen 443 ssl http2;` (and the `[::]`
+line likewise) and `sudo systemctl reload nginx`. Every open tab holds
+one connection for the `/events` stream, and over HTTP/1.1 a browser
+allows only about six per host, so without HTTP/2 a sixth tab makes the
+next page load wait. It also installs `certbot.timer`, which renews the certificate
 automatically (`systemctl is-active certbot.timer`). Ports 80 and 443
 must be open in the host's firewall; on GCP that is the `http-server`
 and `https-server` network tags on the instance.
