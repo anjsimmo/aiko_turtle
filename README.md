@@ -1,11 +1,14 @@
-# Aiko Imagineering — 2026-08-22
+# aiko_turtle
 
-A virtual **ChatRobotAgent** ("Angie's TurtleBot" pattern) built on
+A virtual TurtleBot you drive from Aiko Chat, with the robot and the chat
+side by side in a browser. Built during the 2026-08-22 Aiko imagineering
+session.
+
+It is a **ChatRobotAgent** ("Angie's TurtleBot" pattern) built on
 [aiko_services](https://github.com/geekscape/aiko_services) and
 [aiko_chat](https://github.com/geekscape/aiko_chat), following the
 2026-08-15 Aiko Services Design doc and the 2026-08-22 imagineering plan.
-The demo shows the **robot and the chat side by side** in a browser page:
-drive the robot from the chat and watch it move.
+Drive the robot from the chat and watch it move.
 
 It runs against the **official, unmodified** `aiko_services` (master) and
 `aiko_chat` (main). Everything here is application code in this directory.
@@ -56,6 +59,7 @@ Locally you run only the robot side:
 - Python 3.12+ with the two official packages installed, for example:
 
   ```bash
+  git clone https://github.com/anjsimmo/aiko_turtle
   git clone https://github.com/geekscape/aiko_services && pip install -e aiko_services
   git clone https://github.com/geekscape/aiko_chat     && pip install -e aiko_chat
   ```
@@ -73,7 +77,7 @@ Locally you run only the robot side:
 ## Run it
 
 ```bash
-cd imagineering-2026-08-22
+cd aiko_turtle
 ./start.sh      # robot, LLM agent, web page (logs in logs/)
 ./stop.sh       # stops them and the robot's elements
 ```
