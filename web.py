@@ -35,6 +35,18 @@ from world_model import parse_pose_text
 
 _REQUEST_TIMEOUT = 5.0
 _HOST = "web"                   # "host" of robots created through REST
+_MQTT_TOPIC_LIMIT = 64          # distinct topic patterns /api/mqtt may watch
+
+
+def _topic_matches(pattern, topic):
+    """MQTT topic filter matching: + is one level, # the rest"""
+    p, t = pattern.split("/"), topic.split("/")
+    for index, part in enumerate(p):
+        if part == "#":
+            return True
+        if index >= len(t) or (part != "+" and part != t[index]):
+            return False
+    return len(p) == len(t)
 
 
 class AikoBackend(aiko.Actor):
@@ -53,6 +65,8 @@ class AikoBackend(aiko.Actor):
         self.followed = {channel}       # channels relayed to the page
         self.chat_share = {}            # the ChatServer's share (channel_list)
         self.chat_consumer = None
+        self.mqtt_watchers = {}     # topic pattern -> {clients with put()}
+        self.mqtt_lock = threading.Lock()
         self.hosted = {}            # robot name -> ChatRobotAgent (ours)
         self.external = set()       # robots with their own live process
         self.kinds = {}             # robot name -> kind, from the share
@@ -180,11 +194,12 @@ class AikoBackend(aiko.Actor):
 
     @staticmethod
     def _robot(row):
-        # row: [command, name, x, y, heading, kind, (host, owner)]
+        # row: [command, name, x, y, heading, kind, z, (host, owner)]
         robot = {"name": row[1], "x": float(row[2]), "y": float(row[3]),
-                 "heading": float(row[4]), "kind": row[5]}
-        if len(row) > 7:
-            robot["host"], robot["owner"] = row[6], row[7]
+                 "heading": float(row[4]), "kind": row[5],
+                 "z": float(row[6]) if len(row) > 6 else 0.0}
+        if len(row) > 8:
+            robot["host"], robot["owner"] = row[7], row[8]
         return robot
 
     # -- Backend methods (webapp.py) ------------------------------------------
@@ -201,9 +216,9 @@ class AikoBackend(aiko.Actor):
         return self._robot(self._request(
             lambda world, topic: world.get_pose(name, topic))[0])
 
-    def create_robot(self, name, kind, owner):
+    def create_robot(self, name, kind, owner, x=0.0, y=0.0, heading=0.0):
         robot = self._robot(self._request(lambda world, topic:
-            world.create_robot(name, kind, owner, _HOST, topic))[0])
+            world.create_robot(name, kind, owner, _HOST, topic, x, y, heading))[0])
         self._post_message(ActorTopic.IN, "host", [name, kind, owner])
         return robot
 
@@ -221,6 +236,11 @@ class AikoBackend(aiko.Actor):
         return self._robot(self._request(lambda world, topic:
             world.apply_turn(name, angle, username, topic))[0])
 
+    def place(self, name, x, y, heading, username):
+        return self._robot(self._request(lambda world, topic:
+            world.apply_place(name, x, y, "-" if heading is None else heading,
+                              username, topic))[0])
+
     def reset(self, name, username):
         return self._robot(self._request(lambda world, topic:
             world.reset(name, username, topic))[0])
@@ -231,7 +251,8 @@ class AikoBackend(aiko.Actor):
         return [{"timestamp": float(row[1]), "username": row[2],
                  "command": row[3], "argument": "" if row[4] == "-" else row[4],
                  "x": float(row[5]), "y": float(row[6]),
-                 "heading": float(row[7])} for row in rows]
+                 "heading": float(row[7]),
+                 "z": float(row[8]) if len(row) > 8 else 0.0} for row in rows]
 
     def send_chat(self, username, message, channel=None):
         if not self.chat_server:
@@ -279,6 +300,69 @@ class AikoBackend(aiko.Actor):
             "cache_state": cache.get_state(),
             "services": services,
             "channels": self.channels()}
+
+    # -- MQTT, for /api/mqtt (HTTP threads) ---------------------------------
+
+    def _mqtt_topic(self, topic):
+        prefix = f"{config.AIKO_NAMESPACE}/"
+        if not topic.startswith(prefix) or len(topic) <= len(prefix):
+            raise BackendError(422, f"topic must start with {prefix}")
+        return topic
+
+    def mqtt_subscribe(self, topic, client):
+        """client.put({"topic", "payload", "timestamp"}) for every message
+        on topic (wildcards allowed) until mqtt_unsubscribe().  One Aiko
+        handler per distinct topic, kept for good: removing a wildcard
+        handler trips an aiko_services bug (process.py does "del" on the
+        wildcard list), and the set of topics people ask for is small"""
+        topic = self._mqtt_topic(topic)
+        with self.mqtt_lock:
+            if topic not in self.mqtt_watchers:
+                if len(self.mqtt_watchers) >= _MQTT_TOPIC_LIMIT:
+                    raise BackendError(429, "too many distinct topics watched; "
+                                       "use a wildcard pattern")
+                self.mqtt_watchers[topic] = set()
+                self.add_message_handler(self._mqtt_handler, topic)
+            self.mqtt_watchers[topic].add(client)
+
+    def mqtt_unsubscribe(self, topic, client):
+        with self.mqtt_lock:
+            self.mqtt_watchers.get(topic, set()).discard(client)
+
+    def _mqtt_handler(self, _aiko, message_topic, payload_in):
+        if isinstance(payload_in, bytes):
+            payload_in = payload_in.decode("utf-8", "replace")
+        message = {"kind": "mqtt", "topic": message_topic,
+                   "payload": str(payload_in), "timestamp": time.time()}
+        with self.mqtt_lock:
+            clients = [client for pattern, watchers in self.mqtt_watchers.items()
+                       if _topic_matches(pattern, message_topic)
+                       for client in watchers]
+        for client in clients:
+            client.put(message)
+
+    def mqtt_watch(self, topic, seconds, limit):
+        box = queue.Queue()
+        self.mqtt_subscribe(topic, box)
+        messages, deadline = [], time.monotonic() + seconds
+        try:
+            while len(messages) < limit:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                try:
+                    messages.append(box.get(timeout=remaining))
+                except queue.Empty:
+                    break
+        finally:
+            self.mqtt_unsubscribe(topic, box)
+        return messages
+
+    def mqtt_publish(self, topic, payload):
+        topic = self._mqtt_topic(topic)
+        if "#" in topic or "+" in topic:
+            raise BackendError(422, "cannot publish to a wildcard topic")
+        aiko.process.message.publish(topic, payload)
 
     # -- hosting ChatRobotAgents for REST-created robots (Actor thread) ----
 

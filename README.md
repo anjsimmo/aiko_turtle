@@ -22,11 +22,14 @@ or LeKiwi at the [meetup](https://www.meetup.com/ai-ml-robots/).
 
 **How it was made.** Much of this code was written with an AI coding
 assistant, with a human deciding what to build, reviewing it and running
-it. The hard part, the design of Aiko Services itself and the years of
-study-group discussion behind the Interfaces, is human work by the Aiko
-author and the community, and this project tries to follow it faithfully.
-Pull requests, issues and ideas are welcome from everyone, whatever your
-level; the "Contributing" section says where to start.
+it. The hard part is human work: Aiko Services has been developed over
+years by Andy Gelme, who leads the AI+ML+Robots group, and the group's
+study sessions are where the robot Interfaces used here are being worked
+out. Those Interfaces are a work in progress (Aiko has the machinery for
+defining them; which ones a robot should have is still being thought
+through), so this project is one proposal, not the answer. Pull requests,
+issues and ideas are welcome from everyone, whatever your level; the
+"Contributing" section says where to start.
 
 **Last tested with** aiko_services `39796ee` (2026-11-07) and aiko_chat
 `9edb211` (2026-10-31), the heads of `master` and `main` at the time. The
@@ -133,20 +136,26 @@ curl -X DELETE localhost:8123/api/robots/my_turtle
 ```
 
 Every drive call returns the new pose. `GET /api/kinds` lists the kinds
-and what each can do; `GET /api/chat/channels` the channels.
+and what each can do; `GET /api/chat/channels` the channels. With the
+token, `/api/mqtt` watches a topic, streams one, or publishes to one, so
+any Aiko Service can be called from a language with no Aiko client yet
+(`/guide` has the three curl lines). The page's live stream is a
+WebSocket at `/ws`; `/events` is the same as server-sent events.
 
 **Chat** (the page, `aiko_chat repl` after `:cc robots`, or
 `aiko_chat send robots "..."`):
 
 ```text
 @@my_turtle move 100         ;; <Move>, replies with the new pose
+@@my_drone move 100 0 30     ;; a vector: forward, left, up (as many axes as the kind has)
 @@my_turtle turn 90          ;; degrees counter-clockwise
+@@my_pi place 100 -50        ;; teleport, any kind
 @@my_arm grasp               ;; <Grasp>, kinds with a gripper
 @@my_turtle look             ;; <Perceive>
 @@my_turtle telemetry        ;; <Telemetry>
 @@my_turtle interfaces       ;; <Robot>
 @@my_turtle reset
-@@pilot draw a square with my_turtle     ;; the LLM agent
+@@pilot move my_turtle in a star shape   ;; the LLM agent
 ```
 
 Robots act only on messages that *start* with their `@@name`. Replies end
@@ -178,16 +187,18 @@ claude mcp add turtle -e TURTLE_URL=https://turtle.aiko.hashtag.ai -- python3 $P
 |---|---|---|
 | `turtle` | the classic drawing turtle | Move Perceive Telemetry |
 | `lolibot` | the OHC [LoliBot](https://openhardwareconf.org/wiki/LoliBot), and Jon Oxer's BeetleBot | Move Perceive Telemetry |
-| `xgo` | XGO robot dog | Move Perceive Telemetry |
-| `lekiwi` | LeKiwi: LeRobot's omni base with an SO-101 arm | Move Grasp Perceive Telemetry |
+| `xgo` | XGO robot dog (walks forward and sideways) | Move Perceive Telemetry |
+| `lekiwi` | LeKiwi: LeRobot's omni base with an SO-101 arm (moves sideways too) | Move Grasp Perceive Telemetry |
 | `so101` | LeRobot SO-101 arm: grasps, does not drive | Grasp Perceive Telemetry |
-| `drone` | a generic quadcopter (2D in this world) | Move Perceive Telemetry |
+| `drone` | a generic quadcopter: `move` is a 3D vector, forward, left, up | Move Perceive Telemetry |
 | `pi` | a Raspberry Pi with display, speaker and mic: senses, does not move | Perceive Telemetry |
 | `arrow` | a plain marker | Move Perceive Telemetry |
 
 A kind decides the sprite on the map, the chat commands a robot accepts
-(`@@pi move 10` gets "a pi cannot move") and the aspect tags it registers
-with. Register a robot of a kind and `aiko_registrar list` shows exactly
+(`@@pi move 10` gets "a pi cannot move", `@@turtle move 0 50` gets "a
+turtle cannot move left"), how many axes `move` takes, and the aspect
+tags it registers with. `place X Y` teleports any kind, and so does
+dragging it on the map. Register a robot of a kind and `aiko_registrar list` shows exactly
 what it can do.
 
 **Adding a kind** (a pull request is very welcome, or fork and build your
@@ -269,10 +280,13 @@ the proxy needs `proxy_buffering off` for the SSE endpoint.
   without `<Move>` simply has no `move=0` tag.
 - **The Interfaces** follow the 2026-08-15 study-group design: `<Robot>`
   composed of `<Move>` (move, turn, stop), `<Telemetry>`, `<Perceive>`,
-  and now `<Grasp>` for the arms. `<Navigation>` (move_to a landmark) and
-  the 3D `<Move>` for drones are the obvious next ones; the design's
-  `walk`, `start`/`stop` for low-cost drones, and bumper-style triggers
-  are open questions worth a discussion at the meetup.
+  and `<Grasp>` for the arms. As in that design, `move` takes a vector
+  rather than a command per axis: a number is forward, `[forward, left,
+  up]` in the robot's own frame does the rest, and the kind says how many
+  axes it has (`axes` in `kinds.py`: a turtle 1, an omni base 2, a drone
+  3). `<Navigation>` (move_to a landmark) is the obvious next one; the
+  design's `walk`, `start`/`stop` for low-cost drones, and bumper-style
+  triggers are open questions worth a discussion at the meetup.
 - **One world process, one Actor per robot.** The earlier design (each
   robot a hyperspace collection of lazily started source/target
   processes, with an embedded ProcessManager) is in the git history. It
@@ -308,6 +322,11 @@ or bring it to the [AI+ML+Robots meetup](https://www.meetup.com/ai-ml-robots/)
 robots are.
 
 ## Known issues
+
+- Removing a wildcard message handler in aiko_services raises (process.py
+  does `del` on a list), so `web.py` keeps one handler per distinct MQTT
+  topic pattern watched through `/api/mqtt` and fans out to the current
+  watchers instead. Worth an upstream fix.
 
 - Channel `robots` is not in the ChatServer's channel list (`:lc`); the
   server relays to any channel, so it works. Avoid the channel `robot`,

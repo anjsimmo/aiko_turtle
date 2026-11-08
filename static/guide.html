@@ -11,8 +11,14 @@
 body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 60px; font-family:"IBM Plex Mono",monospace; display:flex; flex-direction:column; align-items:center; font-size:0.84rem; line-height:1.55; }
 header { width:min(100%,860px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 10px; }
 h1 { font-family:"Sora",sans-serif; font-size:1.3rem; margin:0; }
-nav { display:flex; flex-wrap:wrap; gap:14px; font-size:0.8rem; margin-left:auto; }
+h1 .sub { font-family:"IBM Plex Mono",monospace; font-weight:normal; font-size:0.8rem; color:var(--muted); }
+nav { display:flex; flex-wrap:wrap; align-items:center; gap:14px; font-size:0.8rem; margin-left:auto; }
 nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { color:var(--accent); }
+#lock { display:none; align-items:center; gap:5px; background:none; color:var(--muted); border:1px solid var(--line); padding:3px 8px; font-size:0.74rem; }
+#lock.show { display:inline-flex; } #lock.open, #lock:hover { color:var(--accent); border-color:var(--accent); opacity:1; }
+#tokenbar { display:none; width:min(100%,860px); align-items:center; gap:10px; margin:0 0 12px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); font-size:0.74rem; color:var(--muted); flex-wrap:wrap; }
+#tokenbar.show { display:flex; }
+#tokenbar input { flex:1 1 22em; min-width:0; font-family:inherit; font-size:0.8rem; padding:5px 8px; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
 main { width:min(100%,860px); }
 h2 { font-family:"Sora",sans-serif; font-size:1.05rem; margin:34px 0 8px; padding-top:10px; border-top:1px solid var(--line); }
 h3 { font-family:"Sora",sans-serif; font-size:0.9rem; margin:22px 0 6px; }
@@ -31,9 +37,13 @@ a { color:var(--accent); }
 #kinds td:first-child { white-space:nowrap; }
 </style></head><body>
 <header>
-  <h1>Turtle World <span style="font-family:'IBM Plex Mono';font-size:0.8rem;color:var(--muted)">guide</span></h1>
-  <nav><a href="/">home</a><a href="/world">world</a><a href="/chat">chat</a><a href="/guide" class="here">guide</a><a href="/system">system</a><a href="/docs">REST API</a></nav>
+  <h1>Turtle World <span class="sub">guide</span></h1>
+  <nav>
+    <a href="/">home</a><a href="/world">world</a><a href="/chat">chat</a><a href="/guide" class="here">guide</a><a href="/system">system</a><a href="/docs">API</a><a href="https://github.com/anjsimmo/aiko_turtle" title="source code">github</a>
+    <button id="lock" type="button" title="API token" aria-expanded="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> token</button>
+  </nav>
 </header>
+<div id="tokenbar"><label for="token">API token</label><input id="token" type="text" spellcheck="false" placeholder="paste the token"><span id="tokennote">sent as <code>Authorization: Bearer …</code> with every create, drive, chat and MQTT call; the same header works for curl and scripts</span></div>
 <main>
 <p>A shared world of virtual robots for the AI+ML+Robots community: anyone can create a robot, drive it, and watch everyone else's. It runs on <a href="https://github.com/geekscape/aiko_services">Aiko Services</a>, a framework for distributed robots and agents, and the point of the turtles is to learn Aiko by playing. Pick the door that fits you:</p>
 <ul class="toc">
@@ -60,7 +70,9 @@ a { color:var(--accent); }
 @@my_turtle telemetry       ;; battery and temperature
 @@my_turtle interfaces      ;; what this kind can do
 @@my_turtle reset           ;; back to the origin
-__AGENT__ draw a square with my_turtle      ;; the LLM agent, in plain words</pre>
+@@my_pi place 100 -50      ;; teleport, any kind (or drag it on the map)
+@@my_drone move 100 0 30   ;; a vector: forward, left, up (as many axes as the kind has)
+__AGENT__ move my_turtle in a star shape     ;; the LLM agent, in plain words</pre>
 <p>The channel is <code>#__CHANNEL__</code> by default. The dropdown in the chat header lists the channels the ChatServer knows and lets you switch or create one (type a new name under <em>other</em>). Robots listen in <code>#__CHANNEL__</code>; tell one <code>@@name join lab</code> to move it. The same chat is open from a terminal with Aiko installed (next section): <code>aiko_chat repl</code>, then <code>:cc __CHANNEL__</code>.</p>
 
 <h2 id="aiko">2. Python with Aiko: the real thing</h2>
@@ -83,6 +95,32 @@ aiko_chat send __CHANNEL__ "@@my_turtle move 100"</pre>
 <p><code>examples/aiko_drive.py</code> finds a robot in the Registrar and calls its <code>&lt;Move&gt;</code> functions directly; <code>examples/agent_bot.py</code> is a 60-line chat agent that discovers robots by their tags and drives them. The notebook <code>examples/colab_turtle.ipynb</code> does the REST and the Aiko path step by step in Google Colab.</p>
 <pre>python3 examples/aiko_drive.py my_turtle
 python3 examples/agent_bot.py            # then, in the chat:  @@square my_turtle</pre>
+<h3>Write your own chat agent</h3>
+<p>A <code>ChatBot</code> is an Aiko Actor that follows a channel. Its <code>process_message()</code> gets every message on that channel, and it replies by sending to the ChatServer. The <code>@@</code> prefix and the <code>!!!!</code> suffix are the conventions that keep bots from answering each other. This one draws a square when told <code>@@square my_turtle</code>.</p>
+<pre>import aiko_services as aiko
+import aiko_chat.bot as bot
+from aiko_chat.protocol import _decode_message
+
+class SquareBot(bot.ChatBot):
+    def __init__(self, context):
+        context.call_init(self, "ChatBot", context)
+        self.botname, self.current_channel = "@@square", "robots"
+
+    def process_message(self, payload_in, **kwargs):
+        fields = _decode_message(payload_in) or {}
+        message = str(fields.get("message", "")).strip()
+        if not message.startswith(self.botname) or message.endswith(" !!!!"):
+            return                                    # not for me / a bot's reply
+        robot = message.split()[1]                    # "@@square my_turtle"
+        for _ in range(4):
+            self.chat_server.send_message(self.botname, ["robots"], f"@@{robot} move 100")
+            self.chat_server.send_message(self.botname, ["robots"], f"@@{robot} turn 90")
+        self.chat_server.send_message(self.botname, ["robots"], "done !!!!")
+
+aiko.compose_instance(SquareBot, aiko.actor_args("square_bot",
+    tags=["ec=true", "chat=0", "agent=0", "botname=@@square"]))
+aiko.process.run()</pre>
+<p>The full version with the Registrar lookup is <code>examples/agent_bot.py</code>; <code>agent.py</code> is the same with an LLM deciding the commands.</p>
 <h3>How a robot is described</h3>
 <p>Every robot registers with one tag per Interface it implements, following Aiko's aspect-tag convention, plus a few for the chat and the agent:</p>
 <pre>chat=0 robot=0 move=0 perceive=0 telemetry=0 botname=@@my_turtle channel=__CHANNEL__ kind=turtle commands=move,turn,...</pre>
@@ -90,24 +128,26 @@ python3 examples/agent_bot.py            # then, in the chat:  @@square my_turtl
 
 <h2 id="rest">3. REST, no Python needed</h2>
 <p>Everything a human can do on the page, over HTTP. The interactive reference is <a href="/docs">/docs</a>. A longer, unusual robot name is less likely to clash with someone else's.</p>
-<pre>curl -X POST __BASE__/api/robots -H 'Content-Type: application/json' \
+<pre>TOKEN=__TOKEN__   # this instance's token; see the lock at the top of the page
+curl -X POST __BASE__/api/robots -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
      -d '{"name": "my_turtle", "kind": "turtle", "owner": "@me"}'
-curl -X POST __BASE__/api/robots/my_turtle/turn -H 'Content-Type: application/json' \
+curl -X POST __BASE__/api/robots/my_turtle/turn -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
      -d '{"angle": 90, "username": "@me"}'
-curl -X POST __BASE__/api/robots/my_turtle/move -H 'Content-Type: application/json' \
+curl -X POST __BASE__/api/robots/my_turtle/move -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
      -d '{"distance": 100, "username": "@me"}'
+curl -X POST __BASE__/api/robots/NAME/place -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"x": 100, "y": -50, "heading": 90, "username": "@me"}'   # teleport, any kind; heading optional
+curl -X POST __BASE__/api/robots/NAME/move -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"distance": [100, 0, 30], "username": "@me"}'           # a vector: forward, left, up (drones have 3 axes, omni bases 2)
 curl __BASE__/api/robots                 # everyone's robots
 curl __BASE__/api/kinds                  # what each kind can do
 curl __BASE__/api/robots/my_turtle/history
 curl -N __BASE__/events                  # live poses and chat (server-sent events)
-curl -X POST __BASE__/api/chat -H 'Content-Type: application/json' \
+curl -X POST __BASE__/api/chat -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
      -d '{"message": "@@my_turtle look", "username": "@me", "channel": "__CHANNEL__"}'
-curl -X DELETE __BASE__/api/robots/my_turtle</pre>
+curl -X DELETE __BASE__/api/robots/my_turtle -H "Authorization: Bearer $TOKEN"</pre>
 <p>Every drive call returns the new pose. <code>examples/rest_drive.py</code> is the same in 30 lines of standard-library Python.</p>
-<p id="authnote"><strong>Token.</strong> This instance <span id="authstate">does not need a token</span>. When one is set, reads stay open and every POST and DELETE needs <code>Authorization: Bearer &lt;token&gt;</code>: the page fills it in for you, <code>/docs</code> has an Authorize button, and for curl and scripts it is one header:</p>
-<pre id="tokenexample" style="display:none">curl -X POST __BASE__/api/robots/my_turtle/move -H 'Authorization: Bearer __TOKEN__' \
-     -H 'Content-Type: application/json' -d '{"distance": 100, "username": "@me"}'
-export TURTLE_API_TOKEN=__TOKEN__        # examples/rest_drive.py and mcp_server.py read this</pre>
+<p>Reads are open. Writes carry the token, shown under the lock at the top of every page (and in <code>/docs</code> under Authorize).</p>
 
 <h2 id="agents">4. Agents and LLMs</h2>
 <p>An agent with Python should use Aiko (section 2): discovery by tags, direct calls, its own Services. <code>examples/agent_bot.py</code> is the template, and <code>agent.py</code> (the <code>__AGENT__</code> you see in the chat) is the same shape with an LLM in the middle and a rate limit. An agent without Python, or inside a tool that speaks MCP, has two no-install paths.</p>
@@ -121,11 +161,19 @@ claude mcp add turtle -e TURTLE_URL=__BASE__ -- python3 /path/to/aiko_turtle/mcp
                            "env": {"TURTLE_URL": "__BASE__", "TURTLE_API_TOKEN": ""}}}}</pre>
 <h3>Plain HTTP, for any agent</h3>
 <p>The OpenAPI description at <a href="/openapi.json">/openapi.json</a> is enough for an agent to call the API by itself. The compact version: robots live in a flat 2D world; a pose is <code>x</code>, <code>y</code> and <code>heading</code> in degrees counter-clockwise from +x; <code>move</code> is along the heading; every write returns the pose; humans and other agents are in the <code>#__CHANNEL__</code> channel, where a message that starts with <code>@@name command</code> drives that robot and anything else is conversation. Name yourself <code>@@something</code>.</p>
+<h3>MQTT over HTTP</h3>
+<p>Everything above the web server is MQTT. With the token you can watch a topic and publish to one over plain HTTP, which is enough to call any Aiko Service from a language that has no Aiko client yet.</p>
+<pre>curl "__BASE__/api/mqtt?topic=aiko/%23&amp;seconds=5" -H "Authorization: Bearer $TOKEN"     # 5 s of everything
+curl -N "__BASE__/api/mqtt/events?topic=aiko/%2B/%2B/%2B/robots&amp;token=$TOKEN"            # stream a topic (token in the URL for SSE)
+curl -X POST __BASE__/api/mqtt -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"topic": "aiko/HOST/PID/SID/in", "payload": "(move 100 @me)"}'                   # call a robot's &lt;Move&gt; directly</pre>
+<p>Topics must start with <code>aiko/</code>; a robot's topic path is in the Registrar table on <a href="/system">/system</a>.</p>
 <p>A2A is not wired up yet; the chat channel is the agent-to-agent bus for now, and a pull request is welcome.</p>
 
 <h2 id="kinds">5. The robot kinds</h2>
 <p>Each kind is a sprite on the map and a set of Interfaces, which decide the commands it accepts and the tags it registers with. They are the robots the group actually builds and brings along.</p>
 <table id="kinds"><thead><tr><th>kind</th><th>what it is</th><th>Interfaces</th><th>chat commands</th></tr></thead><tbody></tbody></table>
+<p><code>move</code> takes a vector in the robot's own frame, <code>forward left up</code>, and the kind says how many axes it has: a turtle one, an omni base or a walking dog two, a drone three (its altitude is <code>z</code> in the pose). <code>place</code> (teleport) works for every kind, and so does dragging it on the map.</p>
 <p><strong>Adding a kind</strong> is one entry in <code>kinds.py</code> and one small drawing function in <code>static/index.html</code>; the README has the recipe. Open a pull request, or start your own project on top of this one, we will link it.</p>
 
 <h2 id="join">6. Real robots, contributing, the meetup</h2>
@@ -133,17 +181,37 @@ claude mcp add turtle -e TURTLE_URL=__BASE__ -- python3 /path/to/aiko_turtle/mcp
 <p>The code is at <a href="https://github.com/anjsimmo/aiko_turtle">github.com/anjsimmo/aiko_turtle</a>. Issues, ideas and pull requests from beginners are as welcome as from the experts. The README says how it is put together and where to start.</p>
 </main>
 <script>
+function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+function load(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+var lock = document.getElementById("lock"), tokenbar = document.getElementById("tokenbar"), token = document.getElementById("token");
+token.value = load("turtle.token", "");
+token.addEventListener("change", function () { store("turtle.token", token.value.trim()); });
+lock.addEventListener("click", function () {
+  var open = tokenbar.className !== "show";
+  tokenbar.className = open ? "show" : ""; lock.className = open ? "show open" : "show"; lock.setAttribute("aria-expanded", open);
+});
+function authHeaders() {
+  var h = { "Content-Type": "application/json" }, t = token.value.trim();
+  if (t) h["Authorization"] = "Bearer " + t;
+  return h;
+}
+var STATUS = fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
+  if (s.auth) {
+    lock.className = "show";
+    if (s.token && !token.value) { token.value = s.token; store("turtle.token", s.token); }
+    if (s.token) document.getElementById("tokennote").textContent = "default token for this instance, already filled in; sent as Authorization: Bearer … with every create, drive, chat and MQTT call, and the same header works for curl and scripts";
+  }
+  return s;
+});
 var base = location.origin;
 document.querySelectorAll("pre").forEach(function (pre) { pre.textContent = pre.textContent.split("__BASE__").join(base); });
-fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
-  if (!s.auth) return;
-  var state = document.getElementById("authstate"), ex = document.getElementById("tokenexample");
-  if (s.token) {
-    state.innerHTML = "<strong>needs a token for writes, and here it is: <code>" + s.token + "</code></strong>";
-    ex.textContent = ex.textContent.split("__TOKEN__").join(s.token); ex.style.display = "block";
-  } else {
-    state.innerHTML = "<strong>needs a token for writes</strong> (ask in the chat or at the meetup)";
-  }
+STATUS.then(function (s) {
+  document.querySelectorAll("pre").forEach(function (pre) {
+    var t = pre.textContent;
+    if (s.auth) t = t.split("__TOKEN__").join(s.token ? s.token : "<ask-in-the-chat>");
+    else t = t.replace(/^TOKEN=.*\n/m, "").split(' -H "Authorization: Bearer $TOKEN"').join("");
+    pre.textContent = t;
+  });
 });
 fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list) {
   var tb = document.querySelector("#kinds tbody");

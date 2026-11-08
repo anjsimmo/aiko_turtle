@@ -11,9 +11,11 @@ import json
 import queue
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Union
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import (
+    Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect,
+)
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
@@ -40,7 +42,8 @@ class Backend:
 
     def status(self): ...                       # {"world": bool, "chat": str|None}
     def list_robots(self): ...                  # [robot, ...]
-    def create_robot(self, name, kind, owner): ...
+    def create_robot(self, name, kind, owner, x=0.0, y=0.0, heading=0.0): ...
+    def place(self, name, x, y, heading, username): ...   # heading None = keep
     def destroy_robot(self, name): ...
     def move(self, name, distance, username): ...
     def turn(self, name, angle, username): ...
@@ -51,6 +54,10 @@ class Backend:
     def channels(self): ...                     # {"following": [...], "known": [...]}
     def follow_channel(self, channel): ...      # start relaying a channel
     def system(self): ...                       # {"mqtt": {...}, "services": [...]}
+    def mqtt_watch(self, topic, seconds, limit): ...   # [{"topic","payload","timestamp"}]
+    def mqtt_publish(self, topic, payload): ...
+    def mqtt_subscribe(self, topic, client): ...       # client.put(message) until
+    def mqtt_unsubscribe(self, topic, client): ...     # unsubscribed
 
 
 class EventHub:
@@ -73,6 +80,7 @@ class EventHub:
     def publish_robot(self, robot):
         event = {"kind": "robot", "name": robot["name"], "x": robot["x"],
                  "y": robot["y"], "heading": robot["heading"],
+                 "z": robot.get("z", 0.0),
                  "type": robot.get("kind", kinds.DEFAULT_KIND)}
         with self.lock:
             trail = self.trails.setdefault(robot["name"], [])
@@ -155,10 +163,23 @@ class RobotCreate(BaseModel):
     kind: str = Field(default=kinds.DEFAULT_KIND,
         description=f"one of {', '.join(kinds.KINDS)} (GET /api/kinds)")
     owner: str = Username
+    x: float = Field(default=0.0, description="where it starts")
+    y: float = 0.0
+    heading: float = 0.0
+
+
+class PlaceRequest(BaseModel):
+    x: float
+    y: float
+    heading: Optional[float] = Field(default=None, description="omit to keep")
+    username: str = Username
 
 
 class MoveRequest(BaseModel):
-    distance: float = Field(description="units forward (negative = backwards)")
+    distance: Union[float, List[float]] = Field(
+        description="a number: units forward (negative = backwards); or a "
+                    "vector [forward, left, up] in the robot's frame, as "
+                    "many axes as the kind has (GET /api/kinds)")
     username: str = Username
 
 
@@ -175,6 +196,13 @@ class ChatMessage(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
     username: str = Username
     channel: Optional[str] = Channel
+
+
+class MqttPublish(BaseModel):
+    topic: str = Field(min_length=1, max_length=256,
+                       description=f"must start with {config.AIKO_NAMESPACE}/")
+    payload: str = Field(max_length=4000,
+                         description="usually an S-expression, e.g. (move 100)")
 
 
 class ChannelRequest(BaseModel):
@@ -209,11 +237,13 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         version="1.1")
     app.state.backend = backend
 
-    def authorized(
+    def authorized(request: Request,
             credentials: HTTPAuthorizationCredentials = Depends(_bearer)):
         if not api_token:
             return
-        if not credentials or credentials.credentials != api_token:
+        given = credentials.credentials if credentials  \
+            else request.query_params.get("token")
+        if given != api_token:
             raise HTTPException(401, "bearer token required (see /guide)",
                                 headers={"WWW-Authenticate": "Bearer"})
 
@@ -258,17 +288,11 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
     def system_page():
         return static_page("system.html")
 
-    @app.get("/events", include_in_schema=False)
-    async def events(request: Request):
-        # Async on purpose: a browser holds one HTTP connection per open
-        # tab for this stream (and allows about six per host), so a closed
-        # tab must be noticed at once.  Starlette cancels an async
-        # generator the moment the client goes away; a blocking one would
-        # sit in a worker thread until its next keepalive
-        hub = backend.hub
-        client = _AsyncClient(asyncio.get_running_loop())
-        _, replay = hub.subscribe(client)
-
+    def sse(request, client, replay, cleanup):
+        # Async on purpose: Starlette cancels an async generator the moment
+        # the client goes away, so a closed tab frees its connection at
+        # once; a blocking generator would sit in a worker thread until
+        # its next keepalive
         async def stream():
             try:
                 for event in replay:
@@ -280,10 +304,48 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
                     except asyncio.TimeoutError:
                         yield ": keepalive\n\n"
             finally:
-                hub.unsubscribe(client)
+                cleanup()
 
         return StreamingResponse(stream(), media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.get("/events", include_in_schema=False)
+    async def events(request: Request):
+        """Live poses, chat and status as server-sent events (curl -N)"""
+        hub = backend.hub
+        client = _AsyncClient(asyncio.get_running_loop())
+        _, replay = hub.subscribe(client)
+        return sse(request, client, replay, lambda: hub.unsubscribe(client))
+
+    @app.websocket("/ws")
+    async def live(websocket: WebSocket):
+        # The page's live stream.  A WebSocket is not counted against the
+        # browser's ~6 HTTP/1.1 connections per host, which a tab holding
+        # an SSE stream is: with several tabs open the next page load
+        # would hang until one closed
+        await websocket.accept()
+        hub = backend.hub
+        client = _AsyncClient(asyncio.get_running_loop())
+        _, replay = hub.subscribe(client)
+
+        async def sender():
+            for event in replay:
+                await websocket.send_text(json.dumps(event))
+            while True:
+                event = await client.queue.get()
+                await websocket.send_text(json.dumps(event))
+
+        task = asyncio.create_task(sender())
+        try:
+            while True:
+                await websocket.receive_text()     # pings; raises on close
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+        finally:
+            task.cancel()
+            hub.unsubscribe(client)
 
     @app.get("/api/status", tags=["world"])
     def status():
@@ -305,6 +367,30 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         Service list (this is what /system shows)"""
         return call(backend.system)
 
+    @app.get("/api/mqtt", tags=["mqtt"], dependencies=write)
+    def mqtt_watch(topic: str, seconds: float = 5, limit: int = 200):
+        """Subscribe to a topic (MQTT wildcards + and # allowed, within
+        the namespace) for up to 30 seconds and return what arrived.
+        The token may also be given as ?token= for this and the stream"""
+        return call(backend.mqtt_watch, topic, max(0.1, min(seconds, 30)),
+                    max(1, min(limit, 1000)))
+
+    @app.post("/api/mqtt", tags=["mqtt"], status_code=202, dependencies=write)
+    def mqtt_publish(body: MqttPublish):
+        """Publish one message.  Example: a robot's <Move> is
+        {"topic": "<its topic_path>/in", "payload": "(move 100 @me)"}"""
+        call(backend.mqtt_publish, body.topic, body.payload)
+        return {"published": True, "topic": body.topic}
+
+    @app.get("/api/mqtt/events", tags=["mqtt"], dependencies=write)
+    async def mqtt_events(request: Request, topic: str):
+        """The same as a stream of server-sent events, until you hang up:
+        curl -N '.../api/mqtt/events?topic=aiko/%23&token=...'"""
+        client = _AsyncClient(asyncio.get_running_loop())
+        call(backend.mqtt_subscribe, topic, client)
+        return sse(request, client, [],
+                   lambda: backend.mqtt_unsubscribe(topic, client))
+
     @app.get("/api/robots", tags=["robots"])
     def list_robots():
         return call(backend.list_robots)
@@ -316,7 +402,8 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         if robot.kind not in kinds.KINDS:
             raise HTTPException(422,
                 f"kind must be one of {', '.join(kinds.KINDS)}")
-        return call(backend.create_robot, robot.name, robot.kind, robot.owner)
+        return call(backend.create_robot, robot.name, robot.kind, robot.owner,
+                    robot.x, robot.y, robot.heading)
 
     @app.get("/api/robots/{name}", tags=["robots"])
     def get_robot(name: str):
@@ -330,13 +417,25 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
 
     @app.post("/api/robots/{name}/move", tags=["drive"], dependencies=write)
     def move(name: str, body: MoveRequest):
+        """distance 100 = forward; [100, 0, 30] = forward and up (a drone);
+        [0, 50] = sideways (an omni base).  Errors if the kind lacks the axis"""
         check_name(name)
+        if isinstance(body.distance, list) and not 1 <= len(body.distance) <= 3:
+            raise HTTPException(422, "distance: a number or 1 to 3 numbers")
         return call(backend.move, name, body.distance, body.username)
 
     @app.post("/api/robots/{name}/turn", tags=["drive"], dependencies=write)
     def turn(name: str, body: TurnRequest):
         check_name(name)
         return call(backend.turn, name, body.angle, body.username)
+
+    @app.post("/api/robots/{name}/place", tags=["drive"], dependencies=write)
+    def place(name: str, body: PlaceRequest):
+        """Teleport: works for every kind, even one that cannot move itself
+        (the page does this when you drag a robot)"""
+        check_name(name)
+        return call(backend.place, name, body.x, body.y, body.heading,
+                    body.username)
 
     @app.post("/api/robots/{name}/reset", tags=["drive"], dependencies=write)
     def reset(name: str, body: Optional[ResetRequest] = None):

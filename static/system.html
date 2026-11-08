@@ -11,8 +11,20 @@
 body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 40px; font-family:"IBM Plex Mono",monospace; display:flex; flex-direction:column; align-items:center; }
 header { width:min(100%,1100px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 14px; }
 h1 { font-family:"Sora",sans-serif; font-size:1.3rem; margin:0; }
-nav { display:flex; flex-wrap:wrap; gap:14px; font-size:0.8rem; margin-left:auto; }
+h1 .sub { font-family:"IBM Plex Mono",monospace; font-weight:normal; font-size:0.8rem; color:var(--muted); }
+nav { display:flex; flex-wrap:wrap; align-items:center; gap:14px; font-size:0.8rem; margin-left:auto; }
 nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { color:var(--accent); }
+#lock { display:none; align-items:center; gap:5px; background:none; color:var(--muted); border:1px solid var(--line); padding:3px 8px; font-size:0.74rem; }
+#lock.show { display:inline-flex; } #lock.open, #lock:hover { color:var(--accent); border-color:var(--accent); opacity:1; }
+#tokenbar { display:none; width:min(100%,1100px); align-items:center; gap:10px; margin:0 0 12px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); font-size:0.74rem; color:var(--muted); flex-wrap:wrap; }
+#tokenbar.show { display:flex; }
+#tokenbar input { flex:1 1 22em; min-width:0; font-family:inherit; font-size:0.8rem; padding:5px 8px; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
+.row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
+.row input[type=text] { flex:1 1 16em; min-width:0; font-family:inherit; font-size:0.78rem; padding:5px 8px; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
+.row select { font-family:inherit; font-size:0.78rem; padding:5px 6px; border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
+.row button { font-family:inherit; font-size:0.78rem; padding:5px 12px; border:1px solid var(--accent); border-radius:4px; background:none; color:var(--accent); cursor:pointer; }
+#watchout { max-height:260px; overflow:auto; }
+a.pick { color:var(--accent); cursor:pointer; text-decoration:underline dotted; }
 main { width:min(100%,1100px); display:grid; gap:16px; }
 .panel { background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:14px; min-width:0; font-size:0.8rem; }
 .panel h2 { font-family:"Sora",sans-serif; font-size:0.95rem; margin:0 0 10px; }
@@ -27,9 +39,13 @@ a { color:var(--accent); }
 .hint { color:var(--muted); font-size:0.74rem; }
 </style></head><body>
 <header>
-  <h1>Turtle World <span style="font-family:'IBM Plex Mono';font-size:0.8rem;color:var(--muted)">system</span></h1>
-  <nav><a href="/">home</a><a href="/world">world</a><a href="/chat">chat</a><a href="/guide">guide</a><a href="/system" class="here">system</a><a href="/docs">REST API</a></nav>
+  <h1>Turtle World <span class="sub">system</span></h1>
+  <nav>
+    <a href="/">home</a><a href="/world">world</a><a href="/chat">chat</a><a href="/guide">guide</a><a href="/system" class="here">system</a><a href="/docs">API</a><a href="https://github.com/anjsimmo/aiko_turtle" title="source code">github</a>
+    <button id="lock" type="button" title="API token" aria-expanded="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> token</button>
+  </nav>
 </header>
+<div id="tokenbar"><label for="token">API token</label><input id="token" type="text" spellcheck="false" placeholder="paste the token"><span id="tokennote">sent as <code>Authorization: Bearer …</code> with every create, drive, chat and MQTT call; the same header works for curl and scripts</span></div>
 <main>
 <section class="panel">
   <h2>The shared Aiko services</h2>
@@ -43,6 +59,22 @@ a { color:var(--accent); }
   <h2>Chat channels</h2>
   <p id="channels"></p>
 </section>
+<section class="panel" id="watchpanel">
+  <h2>Watch and publish (MQTT over HTTP)</h2>
+  <p>What the web server sees on the broker, with the token. Topics must start with <code>aiko/</code>.</p>
+  <form class="row" id="watchform">
+    <input type="text" id="watchtopic" value="aiko/+/+/+/robots" placeholder="topic, + and # allowed" spellcheck="false">
+    <select id="watchsecs"><option>2</option><option selected>5</option><option>10</option><option>30</option></select>
+    <button type="submit">watch</button>
+  </form>
+  <pre id="watchout"></pre>
+  <form class="row" id="pubform">
+    <input type="text" id="pubtopic" placeholder="aiko/HOST/PID/SID/in" spellcheck="false">
+    <input type="text" id="pubpayload" placeholder="(move 100 @me)" spellcheck="false">
+    <button type="submit">publish</button>
+    <span class="hint" id="pubstate"></span>
+  </form>
+</section>
 <section class="panel">
   <h2>Registrar: who is running <span class="hint" id="cache"></span></h2>
   <p>Every Service that has registered: the ProcessManager that keeps the 24x7 services up, the HyperSpace, the ChatServer, the world, each robot (one Service per robot, with its Interfaces as <code>move=0</code>-style tags), the LLM agent, and anyone who connects.</p>
@@ -50,6 +82,61 @@ a { color:var(--accent); }
 </section>
 </main>
 <script>
+function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+function load(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+var lock = document.getElementById("lock"), tokenbar = document.getElementById("tokenbar"), token = document.getElementById("token");
+token.value = load("turtle.token", "");
+token.addEventListener("change", function () { store("turtle.token", token.value.trim()); });
+lock.addEventListener("click", function () {
+  var open = tokenbar.className !== "show";
+  tokenbar.className = open ? "show" : ""; lock.className = open ? "show open" : "show"; lock.setAttribute("aria-expanded", open);
+});
+function authHeaders() {
+  var h = { "Content-Type": "application/json" }, t = token.value.trim();
+  if (t) h["Authorization"] = "Bearer " + t;
+  return h;
+}
+var STATUS = fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
+  if (s.auth) {
+    lock.className = "show";
+    if (s.token && !token.value) { token.value = s.token; store("turtle.token", s.token); }
+    if (s.token) document.getElementById("tokennote").textContent = "default token for this instance, already filled in; sent as Authorization: Bearer … with every create, drive, chat and MQTT call, and the same header works for curl and scripts";
+  }
+  return s;
+});
+function needToken() {
+  tokenbar.className = "show"; lock.className = "show open";
+  return "token needed: see the lock at the top";
+}
+function hms(ts) {
+  var d = new Date(typeof ts === "number" && ts < 1e12 ? ts * 1000 : ts);
+  return isNaN(d) ? "--:--:--" : d.toTimeString().slice(0, 8);
+}
+document.getElementById("watchform").addEventListener("submit", function (e) {
+  e.preventDefault();
+  var topic = document.getElementById("watchtopic").value.trim(), secs = document.getElementById("watchsecs").value, out = document.getElementById("watchout");
+  out.textContent = "listening for " + secs + " s…";
+  fetch("/api/mqtt?topic=" + encodeURIComponent(topic) + "&seconds=" + secs, { headers: authHeaders() }).then(function (r) {
+    if (r.status === 401) { out.textContent = needToken(); return null; }
+    if (!r.ok) { return r.text().then(function (t) { out.textContent = "error " + r.status + ": " + t; return null; }); }
+    return r.json();
+  }).then(function (d) {
+    if (!d) return;
+    var msgs = Array.isArray(d) ? d : (d.messages || []);
+    out.textContent = msgs.length ? msgs.map(function (m) { return hms(m.timestamp !== undefined ? m.timestamp : m.time) + "  " + m.topic + "  " + m.payload; }).join("\n") : "(nothing in " + secs + " s)";
+  }).catch(function (err) { out.textContent = "error: " + err; });
+});
+document.getElementById("pubform").addEventListener("submit", function (e) {
+  e.preventDefault();
+  var state = document.getElementById("pubstate");
+  state.textContent = "publishing…";
+  fetch("/api/mqtt", { method: "POST", headers: authHeaders(),
+    body: JSON.stringify({ topic: document.getElementById("pubtopic").value.trim(), payload: document.getElementById("pubpayload").value }) }).then(function (r) {
+    if (r.status === 401) { state.textContent = needToken(); return; }
+    if (!r.ok) { return r.text().then(function (t) { state.textContent = "error " + r.status + ": " + t; }); }
+    state.textContent = "published";
+  }).catch(function (err) { state.textContent = "error: " + err; });
+});
 function cell(tr, text, cls) { var td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.append(td); return td; }
 function row(table, cells, cls) { var tr = document.createElement("tr"); cells.forEach(function (c) { cell(tr, c, cls); }); table.append(tr); }
 function render() {
@@ -69,7 +156,14 @@ function render() {
     var st = document.querySelector("#services tbody"); st.innerHTML = "";
     (s.services || []).forEach(function (svc) {
       var tr = document.createElement("tr");
-      cell(tr, svc.topic_path); cell(tr, svc.name); cell(tr, svc.protocol); cell(tr, svc.owner); cell(tr, (svc.tags || []).join(" "), "tags");
+      var tp = cell(tr, ""), a = document.createElement("a");
+      a.className = "pick"; a.textContent = svc.topic_path; a.title = "fill the watch and publish forms with this Service";
+      a.addEventListener("click", function () {
+        document.getElementById("pubtopic").value = svc.topic_path + "/in";
+        document.getElementById("watchtopic").value = svc.topic_path + "/#";
+        document.getElementById("watchpanel").scrollIntoView({ behavior: "smooth" });
+      });
+      tp.append(a); cell(tr, svc.name); cell(tr, svc.protocol); cell(tr, svc.owner); cell(tr, (svc.tags || []).join(" "), "tags");
       st.append(tr);
     });
   });

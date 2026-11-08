@@ -2,6 +2,7 @@
 #   pip install -e ../aiko_services -e ../aiko_chat
 fastapi>=0.115
 uvicorn[standard]>=0.30
+websockets>=12       # the page's live stream (uvicorn[standard] brings it; listed in case it does not)
 sqlalchemy>=2.0
 python-dotenv>=1.0
 openai>=1.0          # optional: the LLM ChatAgent falls back to the claude CLI

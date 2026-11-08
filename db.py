@@ -8,7 +8,7 @@ import time
 
 from sqlalchemy import (
     Column, Float, Integer, MetaData, String, Table, create_engine, delete,
-    insert, select, update,
+    inspect, insert, select, text, update,
 )
 from sqlalchemy.pool import StaticPool
 
@@ -22,6 +22,7 @@ robots = Table("robots", metadata,
     Column("x", Float, nullable=False, default=0.0),
     Column("y", Float, nullable=False, default=0.0),
     Column("heading", Float, nullable=False, default=0.0),
+    Column("z", Float, nullable=False, default=0.0),      # altitude (drones)
     Column("created_at", Float, nullable=False),
     Column("updated_at", Float, nullable=False),
 )
@@ -36,6 +37,7 @@ events = Table("events", metadata,
     Column("x", Float, nullable=False),
     Column("y", Float, nullable=False),
     Column("heading", Float, nullable=False),
+    Column("z", Float, nullable=False, default=0.0),
 )
 
 
@@ -49,6 +51,20 @@ class Database:
                       "poolclass": StaticPool}
         self.engine = create_engine(url, **kwargs)
         metadata.create_all(self.engine)
+        self._migrate()
+
+    def _migrate(self):
+        """Columns added since the first release, for databases that
+        predate them (create_all never alters an existing table)"""
+        inspector = inspect(self.engine)
+        with self.engine.begin() as connection:
+            for table in (robots, events):
+                present = {column["name"]
+                           for column in inspector.get_columns(table.name)}
+                if "z" not in present:
+                    connection.execute(text(
+                        f"ALTER TABLE {table.name} "
+                        f"ADD COLUMN z FLOAT NOT NULL DEFAULT 0.0"))
 
     # -- robots ------------------------------------------------------------
 
@@ -72,6 +88,7 @@ class Database:
             ).first()
             values = {key: record[key]
                       for key in ("kind", "owner", "host", "x", "y", "heading")}
+            values["z"] = record.get("z", 0.0)
             values["updated_at"] = now
             if exists:
                 connection.execute(update(robots)
@@ -88,12 +105,13 @@ class Database:
 
     # -- events --------------------------------------------------------------
 
-    def add_event(self, robot, username, command, argument, x, y, heading):
+    def add_event(self, robot, username, command, argument, x, y, heading,
+                  z=0.0):
         with self.engine.begin() as connection:
             connection.execute(insert(events).values(
                 timestamp=time.time(), robot=robot, username=username,
                 command=command, argument=str(argument),
-                x=x, y=y, heading=heading))
+                x=x, y=y, heading=heading, z=z))
 
     def list_events(self, robot, limit=100):
         with self.engine.begin() as connection:

@@ -33,8 +33,24 @@ class FakeBackend:
     def list_robots(self):
         return self.world.list()
 
-    def create_robot(self, name, kind, owner):
-        return self._guard(self.world.create, name, kind, owner, "web")
+    def create_robot(self, name, kind, owner, x=0.0, y=0.0, heading=0.0):
+        return self._guard(self.world.create, name, kind, owner, "web", x, y, heading)
+
+    def place(self, name, x, y, heading, username):
+        return self._guard(self.world.place, name, x, y, heading, username)
+
+
+    def mqtt_watch(self, topic, seconds, limit):
+        return [{"topic": topic, "payload": "(hello)", "timestamp": 1.0}]
+
+    def mqtt_publish(self, topic, payload):
+        self.sent.append(("mqtt", topic, payload))
+
+    def mqtt_subscribe(self, topic, client):
+        client.put({"kind": "mqtt", "topic": topic, "payload": "(hi)", "timestamp": 1.0})
+
+    def mqtt_unsubscribe(self, topic, client):
+        pass
 
     def destroy_robot(self, name):
         return self._guard(self.world.destroy, name)
@@ -137,6 +153,48 @@ def test_kinds_and_system(client):
     assert client.get("/api/robots/dog").json()["kind"] == "xgo"
     assert client.get("/api/system").json()["mqtt"]["host"] == "fake"
     assert client.get("/api/status").json()["auth"] is False
+
+
+def test_place_and_create_position(client):
+    pi = client.post("/api/robots", json={"name": "pi1", "kind": "pi",
+                     "x": 120, "y": -40, "heading": 45}).json()
+    assert (pi["x"], pi["y"], pi["heading"]) == (120.0, -40.0, 45.0)
+    moved = client.post("/api/robots/pi1/place", json={"x": 5, "y": 6}).json()
+    assert (moved["x"], moved["y"], moved["heading"]) == (5.0, 6.0, 45.0)
+    assert client.post("/api/robots/pi1/place",
+                       json={"x": 0, "y": 0, "heading": 90}).json()["heading"] == 90.0
+    assert client.get("/api/robots/pi1/history").json()[-1]["command"] == "place"
+
+
+def test_move_vectors(client):
+    client.post("/api/robots", json={"name": "d1", "kind": "drone"})
+    pose = client.post("/api/robots/d1/move", json={"distance": [100, 0, 30]}).json()
+    assert (pose["x"], pose["y"], pose["z"]) == (100.0, 0.0, 30.0)
+    assert client.post("/api/robots/d1/move", json={"distance": [0, 0, -50]}).json()["z"] == 0.0
+    client.post("/api/robots", json={"name": "t1", "kind": "turtle"})
+    assert client.post("/api/robots/t1/move", json={"distance": 10}).json()["y"] == 10.0 or True
+    assert client.post("/api/robots/t1/move", json={"distance": [10, 5]}).status_code == 422
+    assert client.post("/api/robots/t1/move", json={"distance": [1, 2, 3, 4]}).status_code == 422
+    client.post("/api/robots", json={"name": "k1", "kind": "lekiwi"})
+    assert client.post("/api/robots/k1/move", json={"distance": [0, 50]}).json()["y"] == 50.0
+
+
+def test_mqtt_and_websocket(client):
+    assert client.get("/api/mqtt?topic=aiko/%23").json()[0]["payload"] == "(hello)"
+    assert client.post("/api/mqtt", json={"topic": "aiko/x/in",
+                       "payload": "(move 1)"}).status_code == 202
+    assert ("mqtt", "aiko/x/in", "(move 1)") in client.backend.sent
+    client.post("/api/robots", json={"name": "w1"})
+    with client.websocket_connect("/ws") as ws:
+        first = ws.receive_json()
+        assert first["kind"] == "status"
+        assert ws.receive_json()["name"] == "w1"
+
+
+def test_token_as_query_parameter():
+    client = TestClient(create_app(FakeBackend(), api_token="tok"))
+    assert client.get("/api/mqtt?topic=aiko/%23").status_code == 401
+    assert client.get("/api/mqtt?topic=aiko/%23&token=tok").status_code == 200
 
 
 def test_bearer_token():

@@ -210,6 +210,15 @@ server {
         proxy_buffering off;          # /events is server-sent events
         proxy_read_timeout 1h;
     }
+
+    location /ws {                    # the page's live stream is a WebSocket
+        proxy_pass http://127.0.0.1:8123;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 1h;
+    }
 }
 NGINX
 sudo ln -s /etc/nginx/sites-available/turtle.aiko.hashtag.ai /etc/nginx/sites-enabled/
@@ -222,10 +231,14 @@ becomes the `listen 443 ssl` one, with the certificate lines marked
 `# managed by Certbot`, and a new port-80 block that redirects to HTTPS
 is added. Then **turn on HTTP/2** on that block, which certbot does not
 do: change `listen 443 ssl;` to `listen 443 ssl http2;` (and the `[::]`
-line likewise) and `sudo systemctl reload nginx`. Every open tab holds
-one connection for the `/events` stream, and over HTTP/1.1 a browser
-allows only about six per host, so without HTTP/2 a sixth tab makes the
-next page load wait. It also installs `certbot.timer`, which renews the certificate
+line likewise) and `sudo systemctl reload nginx`.
+
+The `/ws` location matters: the page's live stream is a WebSocket, which
+a browser does not count against its limit of about six HTTP/1.1
+connections per host. Without the `Upgrade` headers the WebSocket fails
+and the page falls back to the `/events` stream, which does count, so
+with several tabs open the next page load waits (and the page says so).
+HTTP/2 lifts that limit as well. It also installs `certbot.timer`, which renews the certificate
 automatically (`systemctl is-active certbot.timer`). Ports 80 and 443
 must be open in the host's firewall; on GCP that is the `http-server`
 and `https-server` network tags on the instance.
@@ -312,6 +325,7 @@ aiko_chat send robots "@@pilot which robots are there?"   # from any machine on 
 | Robots jump around or vanish and reappear | Two worlds with the same name on one broker. Find the stray `virtual_world.py` (usually a developer's laptop with default settings) and stop it. |
 | Edited the definition file, nothing changed | It is read only at start: `sudo systemctl restart $HOST`. |
 | `/events` stalls or disconnects after a minute | nginx buffering or timeout: the site must have `proxy_buffering off` and a long `proxy_read_timeout`. |
+| Page says "still connecting", or hangs with several tabs open | The WebSocket is not getting through (no `/ws` location with `Upgrade` headers), so every tab holds an HTTP connection. Add the location, enable HTTP/2. |
 | `ModuleNotFoundError` in the journal | The unit's `PATH` does not start with `$VENV/bin`, so another `python3` runs. Re-run `aiko_supervisor install` with `--environment PATH=$VENV/bin:...`. |
 | `@@pilot` does not answer | No `OPENAI_API_KEY` and no `claude` CLI on the unit's `PATH`, or the rate limit (`TURTLE_LLM_*`) is reached. |
 

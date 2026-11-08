@@ -15,13 +15,20 @@ body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 24px;
        align-items:center; min-height:100vh; }
 header { width:min(100%,1240px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 4px; }
 h1 { font-family:"Sora",sans-serif; font-size:1.3rem; margin:0; }
-nav { display:flex; flex-wrap:wrap; gap:14px; font-size:0.8rem; margin-left:auto; }
+nav { display:flex; flex-wrap:wrap; align-items:center; gap:14px; font-size:0.8rem; margin-left:auto; }
 nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { color:var(--accent); }
-#status { color:var(--muted); font-size:0.78rem; margin-bottom:14px; width:min(100%,1240px); }
+#lock { display:none; align-items:center; gap:5px; background:none; color:var(--muted); border:1px solid var(--line); padding:3px 8px; font-size:0.74rem; }
+#lock.show { display:inline-flex; } #lock.open, #lock:hover { color:var(--accent); border-color:var(--accent); opacity:1; }
+#tokenbar { display:none; width:min(100%,1240px); align-items:center; gap:10px; margin:0 0 12px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); font-size:0.74rem; color:var(--muted); flex-wrap:wrap; }
+#tokenbar.show { display:flex; }
+#tokenbar input { flex:1 1 22em; min-width:0; }
+#status { color:var(--muted); font-size:0.78rem; margin-bottom:14px; width:min(100%,1240px); display:flex; gap:14px; flex-wrap:wrap; }
+#status .warn { color:var(--warn); }
 #grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px;
         width:min(100%,1240px); align-items:start; }
 @media (max-width: 900px) { #grid { grid-template-columns:1fr; } }
 body.view-world #grid, body.view-chat #grid { grid-template-columns:1fr; width:min(100%,900px); }
+body.view-world #status, body.view-world #tokenbar, body.view-chat #status, body.view-chat #tokenbar, body.view-world header, body.view-chat header { width:min(100%,900px); }
 body.view-world #chatpanel, body.view-chat #worldpanel { display:none; }
 body.view-chat #messages { height:min(70vh,900px); }
 .panel { background:var(--surface); border:1px solid var(--line); border-radius:6px;
@@ -29,7 +36,8 @@ body.view-chat #messages { height:min(70vh,900px); }
 .panel h2 { font-family:"Sora",sans-serif; font-size:0.95rem; margin:0 0 10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .panel h2 span { color:var(--muted); font-weight:normal; font-size:0.78rem; font-family:"IBM Plex Mono",monospace; }
 .panel h2 a { font-size:0.72rem; font-weight:normal; font-family:"IBM Plex Mono",monospace; margin-left:auto; }
-canvas { display:block; width:100%; height:auto; aspect-ratio:1/1; }
+canvas { display:block; width:100%; height:auto; aspect-ratio:1/1; cursor:grab; touch-action:none; }
+canvas.dragging { cursor:grabbing; }
 #robots { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px; font-size:0.78rem; }
 #robots li { display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:4px; padding:4px 8px; cursor:pointer; }
 #robots li.selected { border-color:var(--accent); background:var(--me); }
@@ -40,7 +48,8 @@ canvas { display:block; width:100%; height:auto; aspect-ratio:1/1; }
 input, select { font-family:inherit; font-size:0.8rem; padding:5px 8px;
    border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
 #pose { color:var(--accent); font-size:0.8rem; margin-top:8px; min-height:1.2em; }
-#kindinfo { color:var(--muted); font-size:0.74rem; margin-top:4px; min-height:1.1em; }
+#kindinfo { color:var(--muted); font-size:0.74rem; margin-top:6px; line-height:1.5; }
+#kindinfo code { color:var(--accent); }
 button { font-family:"IBM Plex Mono",monospace; font-size:0.78rem;
          background:var(--accent); color:var(--bg); border:none;
          border-radius:4px; padding:6px 12px; cursor:pointer; }
@@ -68,31 +77,24 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:2px so
         background:var(--warnbg); color:var(--warn); border:1px solid var(--line); }
 #hint.show { display:block; }
 #hint code { font-weight:500; }
-#tokenrow { display:none; gap:8px; align-items:center; margin-top:8px; font-size:0.74rem; color:var(--muted); }
-#tokenrow.show { display:flex; }
-#token { flex:1; min-width:0; font-size:0.78rem; }
-#tokennote { white-space:nowrap; }
 a { color:var(--accent); }
 </style></head><body class="view-__VIEW__">
 <header>
   <h1>Turtle World</h1>
   <nav>
-    <a href="/" id="nav-home">home</a>
-    <a href="/world" id="nav-world">world</a>
-    <a href="/chat" id="nav-chat">chat</a>
-    <a href="/guide">guide</a>
-    <a href="/system">system</a>
-    <a href="/docs">REST API</a>
+    <a href="/" id="nav-home">home</a><a href="/world" id="nav-world">world</a><a href="/chat" id="nav-chat">chat</a><a href="/guide">guide</a><a href="/system">system</a><a href="/docs">API</a><a href="https://github.com/anjsimmo/aiko_turtle" title="source code">github</a>
+    <button id="lock" type="button" title="API token" aria-expanded="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> token</button>
   </nav>
 </header>
-<div id="status">connecting…</div>
+<div id="tokenbar"><label for="token">API token</label><input id="token" type="text" spellcheck="false" placeholder="paste the token"><span id="tokennote">sent with every create, drive and chat; the same <code>Authorization: Bearer …</code> header works for curl and scripts</span></div>
+<div id="status"><span id="conn">connecting…</span><span id="connhelp" class="warn"></span></div>
 <main id="grid">
 <section class="panel" id="worldpanel">
   <h2>World <span id="world"></span><a href="/world">full map</a></h2>
   <canvas id="c" width="600" height="600"></canvas>
   <ul id="robots"></ul>
   <form id="create" autocomplete="off">
-    <input id="newname" placeholder="new robot name" aria-label="new robot name" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" required>
+    <input id="newname" value="@@" aria-label="new robot name" pattern="@*[A-Za-z0-9][A-Za-z0-9_-]{0,63}" spellcheck="false" required>
     <select id="newkind" aria-label="kind"></select>
     <button type="submit">create robot</button>
   </form>
@@ -109,7 +111,6 @@ a { color:var(--accent); }
     <button type="submit">send</button>
   </form>
   <div id="hint"></div>
-  <div id="tokenrow"><label for="token">API token</label><input id="token" type="text" placeholder="this instance needs a bearer token to create, drive and chat" spellcheck="false"><span id="tokennote"></span></div>
 </section>
 </main>
 <script>
@@ -129,16 +130,20 @@ who.value = humanName(load("turtle.username", "__USERNAME__"));
 who.addEventListener("change", function () { who.value = humanName(who.value); store("turtle.username", who.value); });
 function me() { return humanName(who.value); }
 
-// ---- API token (only when this instance has one) ---------------------------
-var token = document.getElementById("token");
+// ---- API token: site wide, under the lock in the header -------------------
+var lock = document.getElementById("lock"), tokenbar = document.getElementById("tokenbar"), token = document.getElementById("token");
 token.value = load("turtle.token", "");
 token.addEventListener("change", function () { store("turtle.token", token.value.trim()); });
+function showToken(open) {
+  tokenbar.className = open ? "show" : ""; lock.className = open ? "show open" : "show"; lock.setAttribute("aria-expanded", open);
+}
+lock.addEventListener("click", function () { showToken(tokenbar.className !== "show"); });
 if (AUTH) {
-  document.getElementById("tokenrow").className = "show";
+  lock.className = "show";
   fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
-    if (!s.token) return;
+    if (!s.token) { if (!token.value) showToken(true); return; }
     if (!token.value) { token.value = s.token; store("turtle.token", s.token); }
-    document.getElementById("tokennote").textContent = "(default: " + s.token + ", sent with every create, drive and chat; the same works for curl and scripts)";
+    document.getElementById("tokennote").innerHTML = "default token for this instance, already filled in; sent with every create, drive and chat, and the same <code>Authorization: Bearer …</code> header works for curl and scripts";
   });
 }
 function api(path, method, body) {
@@ -146,7 +151,7 @@ function api(path, method, body) {
   if (AUTH && token.value.trim()) headers["Authorization"] = "Bearer " + token.value.trim();
   return fetch(path, { method: method || "GET", headers: headers, body: body ? JSON.stringify(body) : undefined })
     .then(function (r) {
-      if (r.status === 401) { document.getElementById("tokenrow").className = "show"; token.focus(); }
+      if (r.status === 401) { showToken(true); token.focus(); }
       return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }, function () { return { ok: r.ok, status: r.status, body: {} }; });
     });
 }
@@ -195,9 +200,11 @@ function bounds() {
   var span = Math.max(maxX - minX, maxY - minY, 300);
   return { minX: (minX + maxX) / 2 - span / 2, minY: (minY + maxY) / 2 - span / 2, span: span };
 }
+var view = null;    // the last draw's transform, for drag-to-teleport
 function draw() {
   var c = colors(), b = bounds();
   function T(p) { return [(p[0] - b.minX) / b.span * S, S - (p[1] - b.minY) / b.span * S]; }
+  view = { T: T, inv: function (q) { return [b.minX + q[0] / S * b.span, b.minY + (S - q[1]) / S * b.span]; } };
   ctx.clearRect(0, 0, S, S);
   var step = Math.pow(10, Math.floor(Math.log10(b.span / 4)));
   ctx.strokeStyle = c.line; ctx.lineWidth = 1;
@@ -226,15 +233,53 @@ function draw() {
       for (var i = 1; i < r.trail.length; i++) { var p = T(r.trail[i]); ctx.lineTo(p[0], p[1]); }
       ctx.stroke(); ctx.globalAlpha = 1;
     }
-    var rp = T([r.x, r.y]);
+    var rp = (dragging && dragging.name === name) ? dragging.at : T([r.x, r.y]);
+    var z = r.z || 0, scale = 1 + Math.min(z, 200) / 200;      // altitude: bigger, with a shadow
+    if (z > 0) { ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.beginPath(); ctx.ellipse(rp[0], rp[1] + 6 + z / 10, 16 * scale, 8 * scale, 0, 0, 7); ctx.fill(); }
+    ctx.save(); ctx.translate(rp[0], rp[1]); ctx.scale(scale, scale); ctx.translate(-rp[0], -rp[1]);
     drawSprite(r.type, rp[0], rp[1], r.heading * Math.PI / 180, c, col);
+    ctx.restore();
     ctx.fillStyle = col; ctx.font = "11px 'IBM Plex Mono',monospace";
-    ctx.fillText(name, rp[0] + 22, rp[1] + 24);
+    ctx.fillText(name + (z > 0 ? " \u2191" + z.toFixed(0) : ""), rp[0] + 22 * scale, rp[1] + 24 * scale);
   });
   var sel = robots[selected];
   document.getElementById("pose").textContent = sel ?
-    selected + " (" + (sel.type || "?") + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) : "";
+    selected + " (" + (sel.type || "?") + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) + ((sel.z || 0) > 0 ? "  z=" + sel.z.toFixed(1) : "") : "";
 }
+
+// ---- drag a robot to teleport it (any kind) ---------------------------------
+var dragging = null;
+function canvasPoint(e) {
+  var r = canvas.getBoundingClientRect();
+  return [(e.clientX - r.left) / r.width * S, (e.clientY - r.top) / r.height * S];
+}
+canvas.addEventListener("pointerdown", function (e) {
+  if (!view) return;
+  var q = canvasPoint(e), hit = null, best = 24;
+  Object.keys(robots).forEach(function (name) {
+    var p = view.T([robots[name].x, robots[name].y]), d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    if (d < best) { best = d; hit = name; }
+  });
+  if (!hit) return;
+  dragging = { name: hit, at: q, moved: false }; selected = hit; renderRobots(); draw();
+  canvas.setPointerCapture(e.pointerId); canvas.className = "dragging"; e.preventDefault();
+});
+canvas.addEventListener("pointermove", function (e) {
+  if (!dragging) return;
+  dragging.at = canvasPoint(e); dragging.moved = true; draw();
+});
+function endDrag(e) {
+  if (!dragging) return;
+  var d = dragging; dragging = null; canvas.className = "";
+  if (d.moved && view) {
+    var w = view.inv(d.at);
+    api("/api/robots/" + d.name + "/place", "POST", { x: Math.round(w[0]), y: Math.round(w[1]), username: me() })
+      .then(function (res) { if (!res.ok) document.getElementById("pose").textContent = "place failed: " + explain(res); });
+  }
+  draw();
+}
+canvas.addEventListener("pointerup", endDrag);
+canvas.addEventListener("pointercancel", endDrag);
 
 // ---- sprites: top-down, nose along +x, one function per kind (kinds.py) -----
 var SPRITES = { turtle: drawTurtle, lolibot: drawLoliBot, xgo: drawXGO, lekiwi: drawLeKiwi,
@@ -366,12 +411,27 @@ function renderRobots() {
   });
   renderChips();
 }
+var newname = document.getElementById("newname");
+newname.addEventListener("focus", function () { if (!newname.value) newname.value = "@@"; });
+newname.addEventListener("input", function () { if (!newname.value.startsWith("@@")) newname.value = "@@" + newname.value.replace(/^@+/, ""); });
+function freeSpot() {
+  // a ring around the origin, away from everyone else, so new robots do not stack
+  var taken = Object.values(robots), best = null, bestD = -1;
+  for (var i = 0; i < 24; i++) {
+    var a = Math.random() * 2 * Math.PI, rad = 60 + Math.random() * 140, p = [rad * Math.cos(a), rad * Math.sin(a)];
+    var d = taken.reduce(function (m, r) { return Math.min(m, Math.hypot(r.x - p[0], r.y - p[1])); }, 1e9);
+    if (d > bestD) { bestD = d; best = p; }
+  }
+  return best || [0, 0];
+}
 document.getElementById("create").addEventListener("submit", function (e) {
   e.preventDefault();
-  var name = document.getElementById("newname").value.trim();
-  api("/api/robots", "POST", { name: name, kind: kindSelect.value, owner: me() }).then(function (res) {
+  var name = newname.value.trim().replace(/^@+/, ""), spot = freeSpot();
+  if (!name) { document.getElementById("pose").textContent = "type a name after the @@"; return; }
+  api("/api/robots", "POST", { name: name, kind: kindSelect.value, owner: me(),
+      x: Math.round(spot[0]), y: Math.round(spot[1]), heading: Math.round(Math.random() * 360) }).then(function (res) {
     if (!res.ok) { document.getElementById("pose").textContent = "create failed: " + explain(res); return; }
-    selected = name; document.getElementById("newname").value = ""; renderRobots(); draw();
+    selected = name; newname.value = "@@"; renderRobots(); draw();
   });
 });
 
@@ -436,12 +496,12 @@ function checkConventions(text) {
   var bare = first.replace(/^@+/, "");
   var isRobot = names.indexOf(bare) >= 0, isAgent = ("@@" + bare) === AGENT || bare === AGENT.replace(/^@+/, "");
   if ((isRobot || isAgent) && !first.startsWith("@@")) {
-    showHint("Robots and agents only answer messages that <em>start</em> with a double at: <code>@@" + bare + " move 100</code>. Or ask the agent: <code>" + AGENT + " drive " + (isRobot ? bare : "a robot") + " in a square</code>.");
+    showHint("Robots and agents only answer messages that <em>start</em> with a double at: <code>@@" + bare + " move 100</code>. Or ask the agent: <code>" + AGENT + " move " + (isRobot ? bare : "a robot") + " in a star shape</code>.");
     return;
   }
   if (!/@@/.test(text)) {
     var mentioned = names.filter(function (n) { return text.indexOf(n) >= 0; })[0];
-    if (mentioned) showHint("Talking about <code>" + mentioned + "</code>? To drive it, start the message with <code>@@" + mentioned + "</code>, e.g. <code>@@" + mentioned + " turn 90</code> — or let <code>" + AGENT + "</code> do it: <code>" + AGENT + " make " + mentioned + " draw a square</code>.");
+    if (mentioned) showHint("Talking about <code>" + mentioned + "</code>? To drive it, start the message with <code>@@" + mentioned + "</code>, e.g. <code>@@" + mentioned + " turn 90</code> — or let <code>" + AGENT + "</code> do it: <code>" + AGENT + " move " + mentioned + " in a star shape</code>.");
   }
 }
 function send(text) {
@@ -458,18 +518,20 @@ var chips = document.getElementById("chips");
 function renderChips() {
   chips.innerHTML = "";
   var sel = robots[selected], kind = sel && KINDS[sel.type], allowed = kind ? kind.commands : null;
-  [["move 100", "move"], ["turn 90", "turn"], ["grasp", "grasp"], ["release", "release"], ["look", "look"], ["reset", "reset"], ["telemetry", "telemetry"]].forEach(function (cmd) {
+  var axes = kind ? kind.axes : 1;
+  [["move 100", "move", 1], ["turn 90", "turn", 1], ["move 0 50", "move", 2], ["move 0 0 30", "move", 3], ["move 0 0 -30", "move", 3], ["grasp", "grasp", 1], ["release", "release", 1], ["look", "look", 1], ["reset", "reset", 1], ["telemetry", "telemetry", 1]].forEach(function (cmd) {
     var b = document.createElement("button"); b.type = "button"; b.textContent = cmd[0];
-    b.disabled = !!(allowed && allowed.indexOf(cmd[1]) < 0);
-    b.title = b.disabled ? "a " + sel.type + " has no " + cmd[1] : "send @@" + (selected || "robot") + " " + cmd[0];
+    b.disabled = !!(allowed && allowed.indexOf(cmd[1]) < 0) || (kind && cmd[2] > axes);
+    if (cmd[2] > 1) b.title = cmd[2] === 2 ? "sideways: omni wheels and walkers" : "up or down: drones";
+    if (!b.title) b.title = b.disabled ? "a " + sel.type + " cannot " + cmd[0] : "send @@" + (selected || "robot") + " " + cmd[0];
     b.addEventListener("click", function () {
       if (!selected) { document.getElementById("pose").textContent = "select or create a robot first"; return; }
       send("@@" + selected + " " + cmd[0]);
     });
     chips.append(b);
   });
-  var ask = document.createElement("button"); ask.type = "button"; ask.textContent = AGENT + " draw a square";
-  ask.addEventListener("click", function () { send(AGENT + " draw a square" + (selected ? " with " + selected : "")); });
+  var ask = document.createElement("button"); ask.type = "button"; ask.textContent = AGENT + " move " + (selected || "a robot") + " in a star";
+  ask.addEventListener("click", function () { send(AGENT + " move " + (selected || "a robot") + " in a star shape"); });
   chips.append(ask);
 }
 renderChips();
@@ -478,37 +540,63 @@ function setStatus(s) {
   document.getElementById("world").textContent = s.world ? "live" : "waiting for world";
   document.getElementById("chatstate").textContent = s.chat ? "connected" : "waiting for chat server";
 }
-// One live stream per visible tab.  A hidden tab closes its stream (a
-// browser allows only ~6 connections per host, and every open tab with a
-// stream holds one) and rebuilds its state from the replay when shown.
-var events = null;
+// ---- the live stream ----------------------------------------------------------
+// A WebSocket first: browsers do not count it against their ~6 HTTP
+// connections per site, which a tab holding a server-sent-events stream
+// is (several open tabs then made the next page load hang).  Falls back
+// to /events (SSE) if the WebSocket cannot connect (an older proxy), and
+// says so if even that takes long.  A hidden tab closes its stream and
+// rebuilds from the replay when shown.
+var live = null, liveTimer = null, useSSE = false;
+var conn = document.getElementById("conn"), connhelp = document.getElementById("connhelp");
+function setConn(text, help) { conn.textContent = text; connhelp.textContent = help || ""; }
+function handle(data) {
+  var d = JSON.parse(data);
+  if (d.kind === "chat") { addMessage(d); return; }
+  if (d.kind === "status") { setStatus(d); return; }
+  if (d.kind === "robot_removed") { delete robots[d.name]; if (selected === d.name) selected = null; renderRobots(); draw(); return; }
+  if (d.kind !== "robot") return;
+  var r = robots[d.name];
+  if (!r) { r = robots[d.name] = { trail: [] }; if (!selected) selected = d.name; }
+  var changedKind = r.type !== d.type;
+  r.x = d.x; r.y = d.y; r.heading = d.heading; r.z = d.z || 0; r.type = d.type;
+  if (changedKind) renderRobots();
+  var last = r.trail[r.trail.length - 1];
+  if (!last || last[0] !== d.x || last[1] !== d.y) r.trail.push([d.x, d.y]);
+  if (r.trail.length > 2000) r.trail.shift();
+  draw();
+}
 function connect() {
-  if (events) return;
+  if (live) return;
   robots = {}; history = {}; selected = null; renderRobots(); redrawMessages(); draw();
-  events = new EventSource("/events");
-  events.onopen = function () { document.getElementById("status").textContent = "live \u2014 create a robot, then drive it from the chat, the REST API, or your own Aiko code (see the guide)"; };
-  events.onerror = function () { document.getElementById("status").textContent = "reconnecting\u2026"; };
-  events.onmessage = function (message) {
-    var d = JSON.parse(message.data);
-    if (d.kind === "chat") { addMessage(d); return; }
-    if (d.kind === "status") { setStatus(d); return; }
-    if (d.kind === "robot_removed") { delete robots[d.name]; if (selected === d.name) selected = null; renderRobots(); draw(); return; }
-    if (d.kind !== "robot") return;
-    var r = robots[d.name];
-    if (!r) { r = robots[d.name] = { trail: [] }; if (!selected) selected = d.name; }
-    var changedKind = r.type !== d.type;
-    r.x = d.x; r.y = d.y; r.heading = d.heading; r.type = d.type;
-    if (changedKind) renderRobots();
-    var last = r.trail[r.trail.length - 1];
-    if (!last || last[0] !== d.x || last[1] !== d.y) r.trail.push([d.x, d.y]);
-    if (r.trail.length > 2000) r.trail.shift();
-    draw();
-  };
+  setConn("connecting\u2026");
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(function () {
+    setConn("still connecting\u2026", "if other Turtle World tabs are open, close them: a browser allows only a few connections per site without HTTP/2");
+  }, 4000);
+  if (!useSSE && "WebSocket" in window) {
+    var ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"), opened = false;
+    live = { close: function () { ws.onclose = null; ws.close(); } };
+    ws.onopen = function () { opened = true; clearTimeout(liveTimer); setConn("live"); };
+    ws.onmessage = function (m) { handle(m.data); };
+    ws.onclose = function () {
+      live = null; clearTimeout(liveTimer);
+      if (!opened) { useSSE = true; connect(); return; }     // no WebSocket here: use SSE
+      setConn("reconnecting\u2026"); setTimeout(connect, 2000);
+    };
+    ws.onerror = function () {};
+    return;
+  }
+  var es = new EventSource("/events");
+  live = { close: function () { es.close(); } };
+  es.onopen = function () { clearTimeout(liveTimer); setConn("live"); };
+  es.onerror = function () { setConn("reconnecting\u2026"); };
+  es.onmessage = function (m) { handle(m.data); };
 }
 function disconnect() {
-  if (!events) return;
-  events.close(); events = null;
-  document.getElementById("status").textContent = "paused while hidden";
+  if (!live) return;
+  live.close(); live = null; clearTimeout(liveTimer);
+  setConn("paused while hidden");
 }
 document.addEventListener("visibilitychange", function () { if (document.hidden) disconnect(); else connect(); });
 window.addEventListener("pagehide", disconnect);

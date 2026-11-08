@@ -6,9 +6,8 @@ import re
 import threading
 import time
 
-COMMANDS = ("move D, turn A, stop, reset, grasp, release, look, telemetry, "
-            "interfaces, join C")
-COMMAND_NAMES = "move,turn,stop,reset,grasp,release,look,telemetry,interfaces,join"
+COMMANDS = ("move D | move F L [U], turn A, stop, reset, place X Y [H], "
+            "grasp, release, look, telemetry, interfaces, join C")
 
 ROBOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
@@ -24,12 +23,18 @@ def parse_command(text):
     match parts:
         case ["move", distance]:
             return "move", [distance]
+        case ["move", forward, left] | ["move", forward, left, _] as parts:
+            return "move", [parts[1:]]          # a vector in the robot's frame
         case ["turn", angle]:
             return "turn", [angle]
         case ["stop"]:
             return "stop", []
         case ["reset"] | ["home"]:
             return "reset", []
+        case ["place" | "teleport" | "goto", x, y]:
+            return "place", [x, y]
+        case ["place" | "teleport" | "goto", x, y, heading]:
+            return "place", [x, y, heading]
         case ["grasp"] | ["grab"] | ["close"]:
             return "grasp", []
         case ["release"] | ["open"]:

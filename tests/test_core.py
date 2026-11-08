@@ -8,7 +8,11 @@ def test_parse_command():
     assert parse_command("battery") == ("telemetry", [])
     assert parse_command("join lab") == ("join", ["lab"])
     assert parse_command("grab") == ("grasp", [])
-    method, error = parse_command("move 1 2")
+    assert parse_command("place 10 -20") == ("place", ["10", "-20"])
+    assert parse_command("teleport 1 2 90") == ("place", ["1", "2", "90"])
+    assert parse_command("move 100 0 30") == ("move", [["100", "0", "30"]])
+    assert parse_command("move 0 50") == ("move", [["0", "50"]])
+    method, error = parse_command("move 1 2 3 4")
     assert method is None and "unknown command" in error
     assert parse_command("")[0] is None
 
@@ -50,4 +54,6 @@ def test_kinds():
     assert set(KINDS) >= {"turtle", "lolibot", "xgo", "lekiwi", "so101", "drone", "pi"}
     assert supports("turtle", "move") and not supports("pi", "move")
     assert supports("so101", "grasp") and not supports("turtle", "grasp")
-    assert kind_commands("pi") == ["look", "telemetry", "interfaces", "join"]
+    from kinds import kind_axes
+    assert (kind_axes("turtle"), kind_axes("lekiwi"), kind_axes("drone"), kind_axes("pi")) == (1, 2, 3, 0)
+    assert kind_commands("pi") == ["look", "telemetry", "interfaces", "join", "place"]

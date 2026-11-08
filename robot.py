@@ -16,9 +16,11 @@
 # The web server (web.py) hosts a ChatRobotAgent in its own process for
 # every robot created through the REST API, with host_robot().
 #
-# Chat commands: move D, turn A, stop, reset, grasp, release, look,
-# telemetry, interfaces, join CHANNEL (those the kind supports).  Only
-# messages STARTING with "@@name" are commands.
+# Chat commands: move D (or move F L [U], a vector in the robot's frame:
+# forward, left, up, as many axes as the kind has), turn A, stop, reset,
+# place X Y [H], grasp, release, look, telemetry, interfaces, join CHANNEL
+# (those the kind supports; "place" teleports any kind).  Only messages
+# STARTING with "@@name" are commands.
 
 import click
 
@@ -35,7 +37,9 @@ from core import parse_command
 from interfaces import (
     Chat, Grasp, Move, Perceive, Robot, Telemetry, aspect_tags,
 )
-from kinds import DEFAULT_KIND, KINDS, kind_commands, kind_interfaces, supports
+from kinds import (
+    DEFAULT_KIND, KINDS, kind_axes, kind_commands, kind_interfaces, supports,
+)
 from virtual_world import VirtualWorld
 
 ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"
@@ -138,6 +142,11 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
         return self._with_world(lambda world: world.reset(
             self.robot_name, username, self.world_response_topic))
 
+    def place(self, x, y, heading="-", username="anonymous"):
+        """Teleport (not part of <Move>: a Pi can be put somewhere too)"""
+        return self._with_world(lambda world: world.apply_place(
+            self.robot_name, x, y, heading, username, self.world_response_topic))
+
     # -- <Grasp> -------------------------------------------------------------
 
     def grasp(self):
@@ -225,6 +234,8 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
                 return self.stop()
             case "reset":
                 return self.reset(username)
+            case "place":
+                return self.place(*arguments, username=username)
             case "grasp":
                 return self.grasp()
             case "release":
@@ -262,10 +273,13 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
 
 
 def _pose_words(fields):
-    # fields: [command, name, x, y, heading, kind]
+    # fields: [command, name, x, y, heading, kind, z]
     try:
-        return (f"x={float(fields[2]):g} y={float(fields[3]):g} "
-                f"heading={float(fields[4]):g}")
+        words = (f"x={float(fields[2]):g} y={float(fields[3]):g} "
+                 f"heading={float(fields[4]):g}")
+        if len(fields) > 6 and float(fields[6]) != 0:
+            words += f" z={float(fields[6]):g}"
+        return words
     except (IndexError, ValueError):
         return " ".join(str(field) for field in fields[1:])
 
@@ -275,6 +289,7 @@ def robot_tags(robot_name, channel, kind):
     interfaces = ["Chat", "Robot", *kind_interfaces(kind)]
     return ["ec=true", "type=chat_robot", *aspect_tags(interfaces),
             f"botname=@@{robot_name}", f"channel={channel}", f"kind={kind}",
+            f"axes={kind_axes(kind)}",
             f"commands={','.join(kind_commands(kind))}"]
 
 

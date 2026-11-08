@@ -81,8 +81,10 @@ def destroy_robot(name: str) -> dict:
 
 
 @mcp.tool()
-def move(name: str, distance: float, username: str = AGENT_NAME) -> dict:
-    """Move a robot forward by distance (negative = backwards); returns the new pose"""
+def move(name: str, distance: float | list[float], username: str = AGENT_NAME) -> dict:
+    """Move a robot: a number = forward (negative = backwards), or a vector
+    [forward, left, up] in its own frame for kinds with more axes (a drone
+    has 3, an omni base 2; see list_kinds).  Returns the new pose"""
     return call("POST", f"/api/robots/{name}/move",
                 {"distance": distance, "username": username})
 
@@ -92,6 +94,16 @@ def turn(name: str, angle: float, username: str = AGENT_NAME) -> dict:
     """Turn a robot by angle degrees counter-clockwise; returns the new pose"""
     return call("POST", f"/api/robots/{name}/turn",
                 {"angle": angle, "username": username})
+
+
+@mcp.tool()
+def place(name: str, x: float, y: float, heading: float | None = None,
+          username: str = AGENT_NAME) -> dict:
+    """Teleport a robot to (x, y), optionally facing heading; any kind"""
+    body = {"x": x, "y": y, "username": username}
+    if heading is not None:
+        body["heading"] = heading
+    return call("POST", f"/api/robots/{name}/place", body)
 
 
 @mcp.tool()

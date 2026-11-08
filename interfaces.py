@@ -44,7 +44,7 @@ class Move(aiko.Interface):
     aiko.Interface.default("Move", "interfaces.MoveDefault")
 
     @abstractmethod
-    def move(self, distance):
+    def move(self, distance):       # a number, or a vector (forward left up)
         pass
 
     @abstractmethod
