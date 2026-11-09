@@ -75,7 +75,7 @@ def test_pose_text_round_trip():
     assert parse_pose_text(pose_text(record)) == record
     assert parse_pose_text(["1", "2", "3"]) == \
         {"x": 1.0, "y": 2.0, "heading": 3.0, "kind": "turtle", "z": 0.0,
-         "pen": 1, "interface": "proposed", "host": "external", "moving": False}
+         "pen": 1, "interface": "robot", "host": "external", "moving": False}
     assert parse_pose_text("(1 2 3 arrow 4)")["kind"] == "arrow"  # an older world
     assert parse_pose_text("nonsense") is None
 

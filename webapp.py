@@ -202,7 +202,7 @@ class CommandRequest(BaseModel):
     command: str = Field(min_length=1, max_length=200,
                          description="a chat command in the robot's own "
                                      "interface, without the mention: e.g. "
-                                     "move 100 (proposed), move 0.2 (irobot), "
+                                     "move 100 (robot), move 0.2 (irobot), "
                                      "action sit (xgo_robot), forward 100 "
                                      "(turtle_robot); or help")
     username: str = Username
@@ -250,7 +250,7 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         title=title,
         description=(
             "Virtual robots in a shared world, each speaking the interface "
-            "of a real robot (or a proposed one), driven over REST here or "
+            "of a real robot (or the Aiko-native robot:0), driven over REST here or "
             "over Aiko Chat (`@@name move 100` in the channel).  Real robots "
             "found in the Registrar appear as replicas.  Create a robot with any "
             "name; a longer, unusual name is less likely to clash with "
@@ -551,7 +551,7 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
     @app.post("/api/robots/{name}/command", tags=["robots"], dependencies=write)
     def command(name: str, body: CommandRequest):
         """A command in the robot's OWN interface, without the @@mention,
-        exactly as the chat takes it: move 100 (proposed), move 0.2
+        exactly as the chat takes it: move 100 (robot), move 0.2
         (irobot), action sit (xgo_robot), forward 100 (turtle_robot);
         "help" lists them.  A replica forwards it to the real robot.  The
         reply comes back here as well as in the chat; a command the

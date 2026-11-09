@@ -1,26 +1,28 @@
-# The proposed interface: <Robot> composed of <Move> <Grasp> <Perceive>
-# <Telemetry> (interfaces.py), one aspect
-# tag per Interface ("move=0").  Nothing physical speaks it yet: it is
-# what the virtual robots speak by default, and one proposal for what a
-# future real robot could speak.  The real ones (irobot.py, xgo_robot.py,
+# <Robot>, the Aiko-native high-level robot interface: <Move> <Grasp>
+# <Perceive> <Telemetry> composed (interfaces.py), one aspect tag per
+# Interface ("move=0"), protocol "robot:0".  A robot that also chats is a
+# <Chat> + <Robot> composition and registers with "chat_robot:0"; that is
+# what every virtual robot here does.  Nothing physical speaks robot:0
+# yet, so its status is proposed; the real ones (irobot.py, xgo_robot.py,
 # turtle_robot.py) are described as they are today.
 
 import aiko_services as aiko
 
 from robots import base
-from interfaces import Grasp, Move, Perceive, Telemetry
+from interfaces import CHAT_ROBOT_PROTOCOL, ROBOT_PROTOCOL, Grasp, Move, Perceive, Telemetry
 
-NAME = "proposed"
-LABEL = "Proposed: Move / Grasp / Perceive / Telemetry"
+NAME = "robot"
+LABEL = "Robot: Move / Grasp / Perceive / Telemetry (Aiko-native)"
 DESCRIPTION = ("move takes a vector in the robot's own frame (forward [left "
                "[up]]), turn is degrees counter-clockwise, grasp / release, "
                "snapshot, telemetry; one aspect tag per Interface. A proposal: "
                "no physical robot speaks it yet")
 STATUS = base.STATUS_PROPOSED
-PROTOCOL = "ai.hashtag.ai/chat_robot:0"
+PROTOCOL = ROBOT_PROTOCOL                    # robot:0, the robot half
+VIRTUAL_PROTOCOL = CHAT_ROBOT_PROTOCOL        # a virtual robot also chats: chat_robot:0
 UNITS = "world units (cm) and degrees"
 SOURCE = "interfaces.py"
-MATCH = None
+MATCH = {"protocol": PROTOCOL}               # a real robot speaking robot:0 gets a replica
 
 # The bodies that speak it by default, and which aspects each has
 KINDS = {
@@ -50,12 +52,12 @@ METHOD_ASPECT = {"move": "Move", "turn": "Move", "stop": "Move",
                  "snapshot": "Perceive", "get_telemetry": "Telemetry"}
 
 
-class ProposedRobot(Move, Grasp, Perceive, Telemetry):
+class AikoRobot(Move, Grasp, Perceive, Telemetry):
     """<Robot> of the 2026-08 design, composed of its four aspects"""
 
 
-base.default_implementation(ProposedRobot)
-Interface = ProposedRobot
+base.default_implementation(AikoRobot)
+Interface = AikoRobot
 
 
 def aspects(kind):

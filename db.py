@@ -17,7 +17,7 @@ metadata = MetaData()
 robots = Table("robots", metadata,
     Column("name", String(64), primary_key=True),
     Column("kind", String(32), nullable=False, default="turtle"),
-    Column("interface", String(32), nullable=False, default="proposed"),
+    Column("interface", String(32), nullable=False, default="robot"),
     Column("owner", String(64), nullable=False, default="anonymous"),
     Column("host", String(32), nullable=False, default="external"),
     Column("source", String(128), nullable=False, default=""),   # a replica: the real robot's topic path
@@ -47,7 +47,7 @@ _ROBOT_COLUMNS = ("kind", "interface", "owner", "host", "source",
                   "x", "y", "heading", "z", "pen")
 _ADDED = {        # columns added since the first release: name -> SQL type and default
     "z": "FLOAT NOT NULL DEFAULT 0.0",
-    "interface": "VARCHAR(32) NOT NULL DEFAULT 'proposed'",
+    "interface": "VARCHAR(32) NOT NULL DEFAULT 'robot'",
     "source": "VARCHAR(128) NOT NULL DEFAULT ''",
     "pen": "INTEGER NOT NULL DEFAULT 1",
 }

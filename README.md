@@ -212,18 +212,18 @@ versions of these tables.
 | `xgo_robot` | real | the XGO dog's Actor: `move x\|y STRIDE_MM` and `turn DEG/S` continuous until `stop`, `action NAME` from its table, `arm`, `claw` | the aiko_chat XGO example |
 | `turtle_robot` | legacy | the June-2026 tutorial turtle: `forward` `backward` `left` `right` `action` | `../old_tutorials` |
 | `lolibot` | proposed | `forward\|reverse\|left\|right [SECONDS]`, `stop`, `led R G B`, `speed %`: the updated firmware in `lolibot_mp/` | `../od_micro_py_files`, 2018 words kept |
-| `proposed` | proposed | the sandbox's `<Move>` `<Grasp>` `<Perceive>` `<Telemetry>`: `move` as a vector, `turn`, `stop`, `grasp`, `release`, `snapshot`, `get_telemetry` | `interfaces.py` |
+| `robot` | proposed | the Aiko-native `<Robot>`: `<Move>` `<Grasp>` `<Perceive>` `<Telemetry>` composed; `move` as a vector, `turn`, `stop`, `grasp`, `release`, `snapshot`, `get_telemetry`. Protocol `robot:0`; a virtual robot also chats and registers `chat_robot:0` | `interfaces.py` |
 
 | kind | what it is | interfaces it may speak |
 |---|---|---|
-| `turtle` | the classic drawing turtle | turtle_robot (the tutorial's, the default), proposed |
-| `lolibot` | the OHC [LoliBot](https://openhardwareconf.org/wiki/LoliBot), and Jon Oxer's BeetleBot | lolibot, proposed |
-| `xgo` | XGO robot dog (walks forward and sideways) | xgo_robot, proposed |
-| `irobot` | iRobot Create 3 with a Pi on top | irobot, proposed |
-| `lekiwi` | LeKiwi: LeRobot's omni base with an SO-101 arm | proposed |
-| `so101` | LeRobot SO-101 arm: grasps, does not drive | proposed |
-| `drone` | a generic quadcopter: `move` is forward, left, up | proposed |
-| `pi` | a Raspberry Pi with display, speaker and mic: senses, does not move | proposed |
+| `turtle` | the classic drawing turtle | turtle_robot (the tutorial's, the default), robot |
+| `lolibot` | the OHC [LoliBot](https://openhardwareconf.org/wiki/LoliBot), and Jon Oxer's BeetleBot | lolibot, robot |
+| `xgo` | XGO robot dog (walks forward and sideways) | xgo_robot, robot |
+| `irobot` | iRobot Create 3 with a Pi on top | irobot, robot |
+| `lekiwi` | LeKiwi: LeRobot's omni base with an SO-101 arm | robot |
+| `so101` | LeRobot SO-101 arm: grasps, does not drive | robot |
+| `drone` | a generic quadcopter: `move` is forward, left, up | robot |
+| `pi` | a Raspberry Pi with display, speaker and mic: senses, does not move | robot |
 
 Real interfaces are described **as the robot's code is today**, not as a
 future design might wish; the dangerous functions (`power_off`, `e_stop`,

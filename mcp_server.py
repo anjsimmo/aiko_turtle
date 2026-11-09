@@ -133,7 +133,7 @@ def reset(name: str, x: float = 0, y: float = 0, heading: float = 0,
 def command(name: str, command: str, username: str = AGENT_NAME) -> dict:
     """A command in the robot's own interface, without the @@mention
     (see robot_interface or list_interfaces for the words): move 100 for
-    the proposed interface, move 0.2 for an irobot, action sit for an
+    the Aiko-native robot interface, move 0.2 for an irobot, action sit for an
     xgo_robot, forward 100 for a legacy turtle; "help" lists them.  The
     reply text comes back; a command the interface lacks is an error"""
     return call("POST", f"/api/robots/{name}/command",

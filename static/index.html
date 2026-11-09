@@ -259,7 +259,7 @@ function explain(res) { return res.body && res.body.detail ? (typeof res.body.de
 // ---- kinds, interfaces and sprites -------------------------------------------
 // A kind is a body (a sprite, how many axes it moves in); an interface is
 // what the robot speaks, "name:version (status)".  Each kind lists the
-// interfaces it may speak, the real robot's first, then legacy, then proposed.
+// interfaces it may speak, the real robot's first, then legacy, then proposed (robot:0).
 var KINDS = {}, IFACES = {}, SPRITES = {}, kindSelect = document.getElementById("newkind"), ifaceSelect = document.getElementById("newiface");
 fetch("/api/interfaces").then(function (r) { return r.json(); }).then(function (list) { list.forEach(function (i) { IFACES[i.name] = i; }); describeKind(); });
 fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list) {

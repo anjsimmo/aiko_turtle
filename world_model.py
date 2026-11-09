@@ -262,7 +262,7 @@ def pose_text(record):
     return (f"({record['x']:.3f} {record['y']:.3f} {record['heading']:.3f} "
             f"{record['kind']} {record.get('z', 0.0):.3f} "
             f"{'down' if record.get('pen', 1) else 'up'} "
-            f"{record.get('interface', 'proposed')} {record.get('host', 'external')} "
+            f"{record.get('interface', 'robot')} {record.get('host', 'external')} "
             f"{'moving' if record.get('moving') else 'still'})")
 
 
@@ -283,6 +283,6 @@ def parse_pose_text(text):
     return {"x": x, "y": y, "heading": heading, "z": z,
             "kind": parts[3] if len(parts) > 3 else "turtle",
             "pen": 0 if len(parts) > 5 and parts[5] == "up" else 1,
-            "interface": parts[6] if len(parts) > 6 else "proposed",
+            "interface": parts[6] if len(parts) > 6 else "robot",
             "host": parts[7] if len(parts) > 7 else "external",
             "moving": len(parts) > 8 and parts[8] == "moving"}

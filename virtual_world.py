@@ -164,7 +164,7 @@ def _pose_fields(record):
     return [record["name"], f"{record['x']:.3f}", f"{record['y']:.3f}",
             f"{record['heading']:.3f}", record["kind"],
             f"{record.get('z', 0.0):.3f}", record.get("host", "external"),
-            record.get("owner", "anonymous"), record.get("interface", "proposed"),
+            record.get("owner", "anonymous"), record.get("interface", "robot"),
             record.get("source") or "-", "down" if record.get("pen", 1) else "up",
             "moving" if record.get("moving") else "still"]
 

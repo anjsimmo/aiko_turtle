@@ -14,6 +14,8 @@
 #   NAME         interface id, [a-z0-9_]+ (also the "interface=" tag)
 #   LABEL, DESCRIPTION, STATUS (base.STATUS_*), UNITS (what numbers mean)
 #   PROTOCOL     the Aiko protocol string the robot registers with ("" if none)
+#   VIRTUAL_PROTOCOL  what a virtual robot speaking it registers with, when
+#                that differs (robot:0's virtual robots also chat: chat_robot:0)
 #   SOURCE       where the interface was taken from (a file, a repo, a person)
 #   Interface    aiko.Interface subclass: the abstract methods, docstrings
 #                are the spec people read on the page

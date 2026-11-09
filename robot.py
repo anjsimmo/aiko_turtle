@@ -17,7 +17,7 @@
 # Anyone can run a virtual one, from anywhere, against the shared services:
 #
 #   source env.sh
-#   ./robot.py run --name my_turtle [--kind turtle] [--interface proposed]
+#   ./robot.py run --name my_turtle [--kind turtle] [--interface robot]
 #
 # then, in the channel:  @@my_turtle move 100
 #
@@ -48,7 +48,7 @@ from robots import base
 from interfaces import Chat, Robot
 from virtual_world import VirtualWorld
 
-ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"   # virtual robots with no protocol of their own
+ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"   # <Chat> + <Robot>: virtual robots with no protocol of their own
 REPLICA_PROTOCOL = "ai.hashtag.ai/replica:0"
 ACK_SUFFIX = " !!!!"            # loop-prevention convention, see aiko_chat.bot
 SANDBOX_TAG = "sandbox"         # sandbox=virtual | sandbox=replica: ours, in the Registrar
@@ -476,7 +476,8 @@ def host_robot(robot_name, kind=registry.DEFAULT_KIND, owner="anonymous",
     kind, interface = registry.resolve(kind, interface)
     module = registry.INTERFACES[interface]
     init_args = aiko.actor_args(
-        robot_name, protocol=module.PROTOCOL or ROBOT_PROTOCOL,
+        robot_name, protocol=getattr(module, "VIRTUAL_PROTOCOL", None)
+            or module.PROTOCOL or ROBOT_PROTOCOL,
         tags=robot_tags(robot_name, channel, kind, interface, world_name))
     init_args.update({"robot_name": robot_name, "channel": channel,
                       "world_name": world_name, "kind": kind,

@@ -77,7 +77,7 @@ def test_module_contract(name):
 def test_kinds_and_resolution():
     assert list(robots.KINDS)[:4] == ["turtle", "lolibot", "xgo", "irobot"]
     assert robots.resolve("turtle", None) == ("turtle", "turtle_robot")   # the tutorial's, by default
-    assert robots.resolve("lekiwi", None) == ("lekiwi", "proposed")
+    assert robots.resolve("lekiwi", None) == ("lekiwi", "robot")
     assert robots.protocol_version("a/b/xgo_robot:0") == "0" and robots.protocol_version("") is None
     assert robots.resolve("xgo", None) == ("xgo", "xgo_robot")        # the real one first
     assert robots.resolve("turtle", "turtle_robot") == ("turtle", "turtle_robot")
@@ -89,19 +89,21 @@ def test_kinds_and_resolution():
     for kind in robots.describe_kinds():
         assert kind["interfaces"][0] == kind["interface"]
         assert kind["sprite"] and kind["axes"] in (0, 1, 2, 3)
-    assert "move=0" in robots.tags("proposed", "turtle")
-    assert "move=0" not in robots.tags("proposed", "pi")
+    assert "move=0" in robots.tags("robot", "turtle")
+    assert "move=0" not in robots.tags("robot", "pi")
+    module = robots.INTERFACES["robot"]
+    assert module.PROTOCOL.endswith("/robot:0") and module.VIRTUAL_PROTOCOL.endswith("/chat_robot:0")
 
 
-def test_proposed_virtual_robot():
-    robot, agent = virtual("proposed")
+def test_aiko_native_virtual_robot():
+    robot, agent = virtual("robot")
     assert robot.move(100) is None and agent.calls[-1] == ("apply_move", [[100.0, 0.0, 0.0]])
     robot.move("0 50"); assert agent.calls[-1] == ("apply_move", [[0.0, 50.0, 0.0]])
     robot.turn(90); assert agent.calls[-1] == ("apply_turn", [90.0])
     assert "forward" in robot.move("1 2 3 4")
     assert robot.grasp() and robot.gripper == "closed"
     assert robot.release() and robot.gripper == "open"
-    module = robots.INTERFACES["proposed"]
+    module = robots.INTERFACES["robot"]
     assert module.parse_command("move 100") == ("move", ["100"])
     assert module.parse_command("move 0 50") == ("move", [["0", "50"]])
     assert module.parse_command("battery") == ("get_telemetry", [])
@@ -181,7 +183,7 @@ def test_body_ops_and_method_specs():
     body.apply(("place", 1, 2, 3)); assert agent.calls[-1][0] == "reset"
     body.apply(("pen", False)); assert agent.calls[-1] == ("set_pen", ["up"])
     assert "unknown op" in body.apply(("fly",))
-    specs = base.method_specs(robots.INTERFACES["proposed"].Interface)
+    specs = base.method_specs(robots.INTERFACES["robot"].Interface)
     assert [spec["name"] for spec in specs][:1] and all("(" in spec["signature"] for spec in specs)
     assert base.number("1.5", "x") == 1.5
     with pytest.raises(ValueError):

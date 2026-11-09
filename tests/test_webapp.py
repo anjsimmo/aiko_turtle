@@ -262,7 +262,7 @@ def test_event_replay_for_a_new_page(client):
 
 def test_interfaces_and_wire(client):
     names = {i["name"]: i for i in client.get("/api/interfaces").json()}
-    assert names["irobot"]["status"] == "real" and names["proposed"]["status"] == "proposed"
+    assert names["irobot"]["status"] == "real" and names["robot"]["status"] == "proposed"
     spec = client.get("/api/interfaces/xgo_robot?kind=xgo").json()
     assert "move" in [m["name"] for m in spec["methods"]]
     assert client.get("/api/interfaces/nope").status_code == 404
