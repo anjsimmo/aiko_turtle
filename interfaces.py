@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Aiko Chat and Robot Interfaces, per "2026-08-15: Aiko Services Design"
+# The proposed Aiko Chat and Robot Interfaces
 #
 # <Chat>  ... send_message / receive_message
 # <Robot> ... composed with one or more of <Move> <Grasp> <Telemetry> <Perceive>

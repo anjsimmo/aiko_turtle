@@ -10,9 +10,9 @@
 #
 #   virtual  the Simulated implementation of the interface: a call acts on
 #            the body in the world            (host "web" or "external")
-#   twin     the replica of a REAL robot found in the Registrar: a call is
+#   replica     the replica of a REAL robot found in the Registrar: a call is
 #            forwarded to the real Actor, and what the real one sends and
-#            receives moves the twin by dead reckoning   (host "twin")
+#            receives moves the replica by dead reckoning   (host "replica")
 #
 # Anyone can run a virtual one, from anywhere, against the shared services:
 #
@@ -22,8 +22,8 @@
 # then, in the channel:  @@my_turtle move 100
 #
 # The web server (web.py) hosts one for every robot created over REST and
-# a twin for every real robot it discovers, with host_robot() and
-# host_twin().
+# a replica for every real robot it discovers, with host_robot() and
+# host_replica().
 #
 # Chat: a message STARTING with "@@name" is a command for that robot, in
 # the words of its interface ("help" lists them).  Every robot also takes
@@ -49,10 +49,10 @@ from interfaces import Chat, Robot
 from virtual_world import VirtualWorld
 
 ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"   # virtual robots with no protocol of their own
-TWIN_PROTOCOL = "ai.hashtag.ai/twin:0"
+REPLICA_PROTOCOL = "ai.hashtag.ai/replica:0"
 ACK_SUFFIX = " !!!!"            # loop-prevention convention, see aiko_chat.bot
-SANDBOX_TAG = "sandbox"         # sandbox=virtual | sandbox=twin: ours, in the Registrar
-RELAY_SECONDS = 15.0            # a twin relays the real robot's "out" this long after a command
+SANDBOX_TAG = "sandbox"         # sandbox=virtual | sandbox=replica: ours, in the Registrar
+RELAY_SECONDS = 15.0            # a replica relays the real robot's "out" this long after a command
 GENERIC = ("help", "interfaces", "commands", "join", "place", "teleport",
            "reset", "home")
 
@@ -341,24 +341,24 @@ class ChatRobotBase(bot.ChatBot, Chat, Robot):
         aiko.process.service_count = count
 
 
-class TwinMixin:
+class ReplicaMixin:
     """The replica of a real robot: every interface function is forwarded
     to the real Actor's "in" topic, and what the real one sends and
-    receives moves the twin by dead reckoning (the module's observe())"""
+    receives moves the replica by dead reckoning (the module's observe())"""
 
-    def twin_attach(self):
-        self.twin_state = {}
+    def replica_attach(self):
+        self.replica_state = {}
         self.last_command_at = 0.0
         self.real = get_service_proxy(f"{self.source}/in", self.module.Interface)
-        self.twin_response_topic = f"{self.topic_path}/twin_response"
+        self.replica_response_topic = f"{self.topic_path}/replica_response"
         self.add_message_handler(self._real_in_handler, f"{self.source}/in")
         self.add_message_handler(self._real_out_handler, f"{self.source}/out")
-        self.add_message_handler(self._twin_response_handler, self.twin_response_topic)
+        self.add_message_handler(self._replica_response_handler, self.replica_response_topic)
 
-    def twin_detach(self):
+    def replica_detach(self):
         self.remove_message_handler(self._real_in_handler, f"{self.source}/in")
         self.remove_message_handler(self._real_out_handler, f"{self.source}/out")
-        self.remove_message_handler(self._twin_response_handler, self.twin_response_topic)
+        self.remove_message_handler(self._replica_response_handler, self.replica_response_topic)
 
     def _observe(self, direction, payload_in):
         try:
@@ -366,7 +366,7 @@ class TwinMixin:
         except Exception:
             return
         for op in registry.observe(self.interface, direction, command,
-                                   arguments, self.twin_state):
+                                   arguments, self.replica_state):
             self.body.apply(op)
 
     def _real_in_handler(self, _aiko, topic, payload_in):
@@ -377,7 +377,7 @@ class TwinMixin:
         if time.time() - self.last_command_at < RELAY_SECONDS:
             self._say(f"(out) {payload_in}")
 
-    def _twin_response_handler(self, _aiko, topic, payload_in):
+    def _replica_response_handler(self, _aiko, topic, payload_in):
         try:
             command, fields = parse(payload_in)
         except Exception:
@@ -389,7 +389,7 @@ class TwinMixin:
         self.last_command_at = time.time()
         arguments = [_wire(argument) for argument in arguments]
         if takes_response:
-            arguments.append(self.twin_response_topic)
+            arguments.append(self.replica_response_topic)
         getattr(self.real, method)(*arguments)
         return f"sent ({' '.join([method, *arguments])}) to {self.source}/in"
 
@@ -404,17 +404,17 @@ def _forwarder(method, takes_response):
 _CLASSES = {}
 
 
-def actor_class(interface, twin=False):
-    """The Actor class for one interface: virtual (Simulated) or twin"""
-    key = (interface, twin)
+def actor_class(interface, replica=False):
+    """The Actor class for one interface: virtual (Simulated) or replica"""
+    key = (interface, replica)
     if key not in _CLASSES:
         module = registry.INTERFACES[interface]
-        if twin:
+        if replica:
             methods = {spec["name"]: _forwarder(
                 spec["name"], "topic_path_response" in spec["signature"])
                 for spec in base.method_specs(module.Interface)}
-            bases = (TwinMixin, ChatRobotBase, module.Interface)
-            name = f"Twin_{interface}"
+            bases = (ReplicaMixin, ChatRobotBase, module.Interface)
+            name = f"Replica_{interface}"
         else:
             # Simulated first: Service.stop() would terminate the process
             methods, bases, name = {}, (module.Simulated, ChatRobotBase,
@@ -454,18 +454,18 @@ def _pose_words(fields):
 
 
 def robot_tags(robot_name, channel, kind, interface, world_name=config.WORLD_NAME,
-               twin_of=None):
+               replica_of=None):
     """Registrar tags: one aspect tag per Interface where the interface
     has aspects (ADR-025), plus what the chat and the agent need.  Tag
     values hold no spaces, one property per tag"""
-    tags = ["ec=true", f"{SANDBOX_TAG}={'twin' if twin_of else 'virtual'}",
+    tags = ["ec=true", f"{SANDBOX_TAG}={'replica' if replica_of else 'virtual'}",
             "type=chat_robot", "chat=0", "robot=0", f"interface={interface}",
             f"botname=@@{robot_name}", f"channel={channel}", f"kind={kind}",
             f"world={world_name}",
             f"commands={','.join(registry.method_names(interface, kind))}"]
     tags += registry.tags(interface, kind)
-    if twin_of:
-        tags.append(f"twin_of={twin_of}")
+    if replica_of:
+        tags.append(f"replica_of={replica_of}")
     return tags
 
 
@@ -486,23 +486,23 @@ def host_robot(robot_name, kind=registry.DEFAULT_KIND, owner="anonymous",
     return robot
 
 
-def host_twin(robot_name, interface, source, kind=None, owner="anonymous",
+def host_replica(robot_name, interface, source, kind=None, owner="anonymous",
               channel=config.CHANNEL, world_name=config.WORLD_NAME):
-    """Create the twin of the real robot at topic path "source" """
-    kind = kind or registry.twin_kind(interface)
+    """Create the replica of the real robot at topic path "source" """
+    kind = kind or registry.replica_kind(interface)
     kind, interface = registry.resolve(kind, interface)
     init_args = aiko.actor_args(
-        f"twin_{robot_name}", protocol=TWIN_PROTOCOL,
+        f"replica_{robot_name}", protocol=REPLICA_PROTOCOL,
         tags=robot_tags(robot_name, channel, kind, interface, world_name,
-                        twin_of=source))
+                        replica_of=source))
     init_args.update({"robot_name": robot_name, "channel": channel,
                       "world_name": world_name, "kind": kind,
-                      "interface": interface, "owner": owner, "host": "twin",
+                      "interface": interface, "owner": owner, "host": "replica",
                       "source": source})
-    twin = aiko.compose_instance(actor_class(interface, twin=True), init_args)
-    twin.twin_attach()
-    twin.attach_known_services()
-    return twin
+    replica = aiko.compose_instance(actor_class(interface, replica=True), init_args)
+    replica.replica_attach()
+    replica.attach_known_services()
+    return replica
 
 
 @click.group()

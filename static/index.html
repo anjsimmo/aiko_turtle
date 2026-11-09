@@ -4,10 +4,10 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 :root { --bg:#f7f6f2; --surface:#ffffff; --ink:#1c2420; --muted:#5c6b62;
-        --line:#d8ded9; --accent:#0b7a4b; --bot:#2456a6; --me:#eef7f1; --danger:#b23a3a; --warn:#8a5a00; --warnbg:#fff6e0; --twin:#7b3fa0; }
+        --line:#d8ded9; --accent:#0b7a4b; --bot:#2456a6; --me:#eef7f1; --danger:#b23a3a; --warn:#8a5a00; --warnbg:#fff6e0; --replica:#7b3fa0; }
 @media (prefers-color-scheme: dark) {
   :root { --bg:#101512; --surface:#182019; --ink:#e6ece7; --muted:#93a398;
-          --line:#2a352c; --accent:#3ecf8e; --bot:#8fb4ff; --me:#1f2d24; --danger:#ff7b7b; --warn:#ffd27a; --warnbg:#2a2412; --twin:#c9a0f0; }
+          --line:#2a352c; --accent:#3ecf8e; --bot:#8fb4ff; --me:#1f2d24; --danger:#ff7b7b; --warn:#ffd27a; --warnbg:#2a2412; --replica:#c9a0f0; }
 }
 * { box-sizing:border-box; }
 body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 24px;
@@ -53,7 +53,7 @@ canvas.dragging { cursor:grabbing; }
 #robots .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
 #robots .kind { color:var(--muted); font-size:0.7rem; }
 #robots .badge { font-size:0.66rem; border-radius:3px; padding:0 5px; background:var(--me); color:var(--accent); }
-#robots .badge.twin { color:var(--twin); background:none; border:1px dashed var(--twin); }
+#robots .badge.replica { color:var(--replica); background:none; border:1px dashed var(--replica); }
 #robots .badge.off { color:var(--muted); border-color:var(--muted); }
 #robots .x { color:var(--danger); background:none; border:none; padding:0 2px; font-size:0.9rem; }
 #pose { color:var(--accent); font-size:0.78rem; margin-top:8px; min-height:1.2em; }
@@ -77,7 +77,19 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:2px so
 .layer .body { padding:10px 12px; min-width:0; }
 .layer .how { color:var(--muted); font-size:0.7rem; line-height:1.5; margin:0 0 8px; }
 .layer .how code { color:var(--accent); }
-.layer .arrow { text-align:center; color:var(--muted); font-size:0.7rem; padding:2px 0 0; grid-column:1 / -1; border-top:1px dashed var(--line); background:var(--bg); }
+.arrow { display:grid; grid-template-columns:5.2em minmax(0,1fr); border-top:1px dashed var(--line); background:var(--bg); }
+.arrow .glyph { display:flex; justify-content:center; align-items:center; color:var(--muted); border-right:1px solid var(--line); }
+.arrow .why { color:var(--muted); font-size:0.64rem; padding:3px 12px; line-height:1.4; }
+@media (max-width:600px) { .layer, .arrow { grid-template-columns:3.8em minmax(0,1fr); } .layer .name small { display:none; } .layer .name { font-size:0.74rem; padding:10px 4px; } }
+#chatrobots { display:none; gap:5px; flex-wrap:wrap; margin:0 0 8px; font-size:0.72rem; align-items:center; color:var(--muted); }
+body.view-chat #chatrobots { display:flex; }
+#chatrobots button { background:var(--surface); color:var(--ink); border:1px solid var(--line); padding:2px 8px; font-size:0.72rem; }
+#chatrobots button.on { border-color:var(--accent); color:var(--accent); background:var(--me); }
+#chatrobots button.replica { border-style:dashed; }
+#chatrobots button.off { opacity:0.5; }
+#ifhead, #aikowire, #mqttnote, #wirelog, .hintline, #pose, #kindinfo { overflow-wrap:anywhere; }
+#create input, #create select, form.send input { max-width:100%; }
+#newname { width:11em; }
 #chathead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:0.78rem; margin:0 0 6px; }
 #chathead span { color:var(--muted); font-size:0.72rem; }
 #chathead a { font-size:0.72rem; margin-left:auto; }
@@ -100,7 +112,7 @@ form.send .grow { flex:1; min-width:0; }
 #hint { display:none; margin-top:8px; padding:8px 10px; border-radius:4px; font-size:0.74rem; background:var(--warnbg); color:var(--warn); border:1px solid var(--line); }
 #hint.show { display:block; } #hint code { font-weight:500; }
 #ifhead { font-size:0.76rem; margin:0 0 6px; line-height:1.5; }
-#ifhead code { color:var(--accent); } #ifhead .real { color:var(--twin); } #ifhead .st { color:var(--muted); font-size:0.7rem; }
+#ifhead code { color:var(--accent); } #ifhead .real { color:var(--replica); } #ifhead .st { color:var(--muted); font-size:0.7rem; }
 #specwrap { max-height:170px; overflow:auto; border:1px solid var(--line); border-radius:4px; margin:0 0 8px; }
 #spec { border-collapse:collapse; font-size:0.7rem; width:100%; }
 #spec td { padding:2px 8px; vertical-align:top; border-bottom:1px solid var(--line); }
@@ -111,7 +123,7 @@ form.send .grow { flex:1; min-width:0; }
 #aikowire, #mqttnote { margin-top:8px; padding:8px 10px; border:1px solid var(--line); border-radius:4px; font-size:0.7rem; background:var(--bg); white-space:pre-wrap; word-break:break-all; display:none; }
 #aikowire.show, #mqttnote.show { display:block; }
 #wirelog { max-height:200px; overflow:auto; background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:8px; font-size:0.66rem; margin:0 0 8px; white-space:pre-wrap; word-break:break-all; }
-#wirelog .t { color:var(--accent); } #wirelog .in { color:var(--bot); } #wirelog .out { color:var(--twin); }
+#wirelog .t { color:var(--accent); } #wirelog .in { color:var(--bot); } #wirelog .out { color:var(--replica); }
 #wirehead { display:flex; align-items:center; gap:10px; font-size:0.7rem; color:var(--muted); margin:0 0 6px; flex-wrap:wrap; }
 #wirehead label { cursor:pointer; }
 a { color:var(--accent); }
@@ -130,10 +142,10 @@ a { color:var(--accent); }
   <h2>World <span id="world"></span><a href="/world">full map</a></h2>
   <div id="mapbar">
     <span id="zoom"><button type="button" id="zin" title="zoom in (or scroll on the map)">+</button><button type="button" id="zout" title="zoom out">&minus;</button><button type="button" id="zfit" title="show every robot">fit all</button></span>
-    <label title="a twin is the replica of a real robot on the broker"><input type="checkbox" id="showtwins" checked> show real robots (twins)</label><span id="twincount"></span>
+    <label title="a replica is the replica of a real robot on the broker"><input type="checkbox" id="showreplicas" checked> show real robots (replicas)</label><span id="replicacount"></span>
   </div>
   <canvas id="c" width="600" height="600"></canvas>
-  <div class="hintline">scroll to zoom · drag the ground to pan · drag a robot to put it somewhere else · dashed ring: a twin of a real robot</div>
+  <div class="hintline">scroll to zoom · drag the ground to pan · drag a robot to put it somewhere else · dashed ring: a replica of a real robot</div>
   <ul id="robots"></ul>
   <div id="pose"></div>
   <form id="create" autocomplete="off">
@@ -149,6 +161,7 @@ a { color:var(--accent); }
     <div class="name">chat<small>people and agents talk here</small></div>
     <div class="body">
       <div id="chathead">#<select id="channel" aria-label="channel"></select> <span id="chatstate"></span><a href="/chat">full chat</a></div>
+      <div id="chatrobots"></div>
       <ol id="messages"><li id="empty">no messages yet</li></ol>
       <div id="chips"></div>
       <form class="send" id="sendchat" autocomplete="off">
@@ -160,7 +173,7 @@ a { color:var(--accent); }
       <div id="hint"></div>
     </div>
   </div>
-  <div class="arrow">&darr; the robot's ChatBot turns the words into a remote function call &darr;</div>
+  <div class="arrow"><div class="glyph"><svg width="14" height="18" viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M7 1v15M2 11l5 5 5-5"/></svg></div><div class="why">the robot's ChatBot reads the channel, parses the words with its interface, and calls the function on its Actor</div></div>
   <div class="layer" id="layer-aiko">
     <div class="name">aiko<small>a function call on the robot's Actor</small></div>
     <div class="body">
@@ -170,11 +183,11 @@ a { color:var(--accent); }
         <input id="call" class="grow" placeholder="forward 100   (a function and its arguments; click one above)" aria-label="function call" spellcheck="false">
         <button type="submit">call</button>
       </form>
-      <p class="how" style="margin:8px 0 0">The call goes to the Actor as an S-expression on its <code>in</code> topic, the same message your own Python makes through a ServiceFilter. For a twin it goes straight to the real robot.</p>
+      <p class="how" style="margin:8px 0 0">The call goes to the Actor as an S-expression on its <code>in</code> topic, the same message your own Python makes through a ServiceFilter. For a replica it goes straight to the real robot.</p>
       <div id="aikowire"></div>
     </div>
   </div>
-  <div class="arrow">&darr; Aiko publishes the S-expression to the Actor's topic &darr;</div>
+  <div class="arrow"><div class="glyph"><svg width="14" height="18" viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M7 1v15M2 11l5 5 5-5"/></svg></div><div class="why">Aiko publishes the call as an S-expression on the Actor's <code>in</code> topic; the reply comes back on <code>out</code> or a reply topic</div></div>
   <div class="layer" id="layer-mqtt">
     <div class="name">mqtt<small>the bytes on the broker</small></div>
     <div class="body">
@@ -185,7 +198,7 @@ a { color:var(--accent); }
         <input id="payload" class="grow" placeholder="(forward 100)" aria-label="MQTT payload" spellcheck="false">
         <button type="submit">publish</button>
       </form>
-      <p class="how" style="margin:8px 0 0">Any Service on the broker can be called this way, from any language, with nothing but an MQTT client (<a href="/system">/system</a> lists them). The log shows the selected robot's topics, the chat channel's, and for a twin the real robot's.</p>
+      <p class="how" style="margin:8px 0 0">Any Service on the broker can be called this way, from any language, with nothing but an MQTT client (<a href="/system">/system</a> lists them). The log shows the selected robot's topics, the chat channel's, and for a replica the real robot's.</p>
       <div id="mqttnote"></div>
     </div>
   </div>
@@ -271,7 +284,7 @@ function describeInterface() {
   t.innerHTML = "";
   t.append(k.description + ". ");
   var c = document.createElement("code"); c.textContent = ifaceLabel(ifaceSelect.value); t.append(c);
-  if (i) t.append(": " + i.description + (i.source ? " (" + i.source + ")" : ""));
+  if (i) t.append(": " + i.description);
 }
 kindSelect.addEventListener("change", describeKind);
 ifaceSelect.addEventListener("change", describeInterface);
@@ -286,11 +299,11 @@ if (!ctx.roundRect) {
   };
 }
 var robots = {}, selected = null;
-var showTwins = document.getElementById("showtwins");
-showTwins.checked = load("turtle.twins", "yes") !== "no";
-showTwins.addEventListener("change", function () { store("turtle.twins", showTwins.checked ? "yes" : "no"); if (!visible(selected)) selected = null; renderRobots(); draw(); });
-function isTwin(r) { return r && r.host === "twin"; }
-function visible(name) { var r = robots[name]; return !!r && (showTwins.checked || !isTwin(r)); }
+var showReplicas = document.getElementById("showreplicas");
+showReplicas.checked = load("turtle.replicas", "yes") !== "no";
+showReplicas.addEventListener("change", function () { store("turtle.replicas", showReplicas.checked ? "yes" : "no"); if (!visible(selected)) selected = null; renderRobots(); draw(); });
+function isReplica(r) { return r && r.host === "replica"; }
+function visible(name) { var r = robots[name]; return !!r && (showReplicas.checked || !isReplica(r)); }
 function shown() { return Object.keys(robots).filter(visible); }
 var PALETTE = ["#0b7a4b","#2456a6","#b5651d","#7b3fa0","#b23a3a","#1f8a8a","#8a7a1f","#c2185b"];
 function colorOf(name) {
@@ -299,7 +312,7 @@ function colorOf(name) {
 }
 function colors() {
   var s = getComputedStyle(document.documentElement);
-  return { line: s.getPropertyValue("--line").trim(), muted: s.getPropertyValue("--muted").trim(), bg: s.getPropertyValue("--surface").trim(), twin: s.getPropertyValue("--twin").trim() };
+  return { line: s.getPropertyValue("--line").trim(), muted: s.getPropertyValue("--muted").trim(), bg: s.getPropertyValue("--surface").trim(), replica: s.getPropertyValue("--replica").trim() };
 }
 var cam = null;     // null: fit every robot and trail; else a fixed view {cx, cy, span}
 function fitBounds() {
@@ -359,11 +372,11 @@ function draw() {
   names.forEach(function (name) {
     var r = robots[name], col = colorOf(name), sp = T([r.x, r.y]);
     if (sp[0] < -10 || sp[0] > S + 10 || sp[1] < -10 || sp[1] > S + 10) offscreen.push([name, sp, col]);
-    var dim = isTwin(r) && !r.online;
+    var dim = isReplica(r) && !r.online;
     ctx.globalAlpha = dim ? 0.35 : (name === selected || !selected ? 1 : 0.6);
     if (r.trail.length > 1) {                      // null breaks the trail: pen up
       ctx.strokeStyle = col; ctx.lineWidth = name === selected ? 3 : 2; ctx.lineCap = "round";
-      if (isTwin(r)) ctx.setLineDash([6, 5]);
+      if (isReplica(r)) ctx.setLineDash([6, 5]);
       ctx.beginPath(); var pen = false;
       for (var i = 0; i < r.trail.length; i++) {
         var p = r.trail[i]; if (!p) { pen = false; continue; }
@@ -374,15 +387,15 @@ function draw() {
     var rp = (dragging && dragging.name === name) ? dragging.at : T([r.x, r.y]);
     var z = r.z || 0, scale = 1 + Math.min(z, 200) / 200;      // altitude: bigger, with a shadow
     if (z > 0) { ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.beginPath(); ctx.ellipse(rp[0], rp[1] + 6 + z / 10, 16 * scale, 8 * scale, 0, 0, 7); ctx.fill(); }
-    if (isTwin(r)) {                               // a real robot's replica: a dashed ring
-      ctx.strokeStyle = c.twin; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+    if (isReplica(r)) {                               // a real robot's replica: a dashed ring
+      ctx.strokeStyle = c.replica; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
       ctx.beginPath(); ctx.arc(rp[0], rp[1], 27 * scale, 0, 7); ctx.stroke(); ctx.setLineDash([]);
     }
     ctx.save(); ctx.translate(rp[0], rp[1]); ctx.scale(scale, scale); ctx.translate(-rp[0], -rp[1]);
     drawSprite(r.type, rp[0], rp[1], r.heading * Math.PI / 180, c, col);
     ctx.restore();
     ctx.fillStyle = col; ctx.font = "11px 'IBM Plex Mono',monospace";
-    ctx.fillText(name + (z > 0 ? " ↑" + z.toFixed(0) : "") + (isTwin(r) ? (r.online ? " (twin)" : " (twin, offline)") : "") + (r.moving ? " …" : ""), rp[0] + 22 * scale, rp[1] + 24 * scale);
+    ctx.fillText(name + (z > 0 ? " ↑" + z.toFixed(0) : "") + (isReplica(r) ? (r.online ? " (replica)" : " (replica, offline)") : "") + (r.moving ? " …" : ""), rp[0] + 22 * scale, rp[1] + 24 * scale);
     ctx.globalAlpha = 1;
   });
   // robots outside the view: an arrow on the edge pointing their way, with the name
@@ -399,7 +412,7 @@ function draw() {
   });
   var sel = robots[selected];
   document.getElementById("pose").textContent = sel ?
-    "@@" + selected + " (" + (sel.type || "?") + ", " + ifaceLabel(sel.interface) + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) + ((sel.z || 0) > 0 ? "  z=" + sel.z.toFixed(1) : "") + (sel.moving ? "  moving" : "") + (sel.pen === false ? "  pen up" : "") + (isTwin(sel) ? "  (a twin: an estimate, not a measurement)" : "") : "";
+    "@@" + selected + " (" + (sel.type || "?") + ", " + ifaceLabel(sel.interface) + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) + ((sel.z || 0) > 0 ? "  z=" + sel.z.toFixed(1) : "") + (sel.moving ? "  moving" : "") + (sel.pen === false ? "  pen up" : "") + (isReplica(sel) ? "  (a replica: an estimate, not a measurement)" : "") : "";
 }
 
 // ---- drag a robot to teleport it (any kind) ---------------------------------
@@ -479,17 +492,17 @@ function renderRobots() {
     var r = robots[name];
     if (!visible(name)) { hidden++; return; }
     var li = document.createElement("li");
-    li.className = (name === selected ? "selected" : "") + (isTwin(r) && !r.online ? " offline" : "");
+    li.className = (name === selected ? "selected" : "") + (isReplica(r) && !r.online ? " offline" : "");
     var d = document.createElement("span"); d.className = "dot"; d.style.background = colorOf(name);
     var label = document.createElement("span"); label.textContent = name;
     var kind = document.createElement("span"); kind.className = "kind"; kind.textContent = (r.type || "") + (r.interface ? " · " + r.interface : "");
     li.append(d, label, kind);
-    if (isTwin(r)) { var b = document.createElement("span"); b.className = "badge twin" + (r.online ? "" : " off"); b.textContent = r.online ? "twin" : "twin, offline"; b.title = "the replica of a real robot" + (r.online ? "" : " that is not on the broker right now"); li.append(b); }
+    if (isReplica(r)) { var b = document.createElement("span"); b.className = "badge replica" + (r.online ? "" : " off"); b.textContent = r.online ? "replica" : "replica, offline"; b.title = "the replica of a real robot" + (r.online ? "" : " that is not on the broker right now"); li.append(b); }
     else if (r.host === "external") { var b2 = document.createElement("span"); b2.className = "badge"; b2.textContent = "own process"; b2.title = "someone runs this robot in their own process (robot.py run)"; li.append(b2); }
     var x = document.createElement("button"); x.className = "x"; x.type = "button"; x.title = "remove " + name; x.textContent = "×";
     x.addEventListener("click", function (e) {
       e.stopPropagation();
-      if (confirm("Remove robot " + name + (isTwin(r) ? " (the twin; the real robot is untouched and comes back when seen again)" : "") + "?")) api("/api/robots/" + name, "DELETE").then(function (res) {
+      if (confirm("Remove robot " + name + (isReplica(r) ? " (the replica; the real robot is untouched and comes back when seen again)" : "") + "?")) api("/api/robots/" + name, "DELETE").then(function (res) {
         if (!res.ok) document.getElementById("pose").textContent = "remove failed: " + explain(res);
       });
     });
@@ -497,7 +510,17 @@ function renderRobots() {
     li.addEventListener("click", function () { select(name); });
     list.append(li);
   });
-  document.getElementById("twincount").textContent = hidden ? "(" + hidden + " hidden)" : "";
+  document.getElementById("replicacount").textContent = hidden ? "(" + hidden + " hidden)" : "";
+  var picker = document.getElementById("chatrobots"); picker.innerHTML = "";
+  var names = Object.keys(robots).sort().filter(visible);
+  picker.append(names.length ? "robots here: " : "no robots yet (create one on the home page)");
+  names.forEach(function (name) {
+    var r = robots[name], b = document.createElement("button"); b.type = "button"; b.textContent = "@@" + name;
+    b.className = (name === selected ? "on" : "") + (isReplica(r) ? " replica" : "") + (isReplica(r) && !r.online ? " off" : "");
+    b.title = (r.type || "") + " · " + ifaceLabel(r.interface) + (isReplica(r) ? " · the replica of a real robot" : "");
+    b.addEventListener("click", function () { select(name); });
+    picker.append(b);
+  });
   renderChips();
 }
 function select(name) { var changed = name !== selected; selected = name; renderRobots(); draw(); if (changed) { describeSelected(); watchWire(); } }
@@ -541,9 +564,9 @@ function describeSelected() {
     head.append("@@" + selected + " speaks "); var c = document.createElement("code"); c.textContent = ifaceLabel(info.interface); head.append(c);
     var st = document.createElement("span"); st.className = "st"; st.textContent = " " + (spec.protocol ? "protocol " + spec.protocol : "no protocol id, matched by name") + (spec.units ? " · " + spec.units : ""); head.append(st);
     head.append(document.createElement("br"));
-    head.append((info.host === "twin" ? "a twin of the real robot at " : "a virtual robot, its Actor at "));
-    var t = document.createElement("code"); t.textContent = (info.host === "twin" ? info.real_topic_path : info.topic_path) || "(no live process)"; head.append(t);
-    if (info.host === "twin") { head.append(" (the twin's own Actor: "); var t2 = document.createElement("code"); t2.textContent = info.topic_path || "?"; head.append(t2, ")"); }
+    head.append((info.host === "replica" ? "a replica of the real robot at " : "a virtual robot, its Actor at "));
+    var t = document.createElement("code"); t.textContent = (info.host === "replica" ? info.real_topic_path : info.topic_path) || "(no live process)"; head.append(t);
+    if (info.host === "replica") { head.append(" (the replica's own Actor: "); var t2 = document.createElement("code"); t2.textContent = info.topic_path || "?"; head.append(t2, ")"); }
     var examples = {};
     (spec.commands || []).forEach(function (cmd) { var m = cmd.example.split(/\s+/)[0]; if (!examples[m]) examples[m] = cmd.example; });
     (spec.methods || []).forEach(function (m) {
@@ -714,8 +737,8 @@ function watchWire() {
 }
 
 function setStatus(s) {
-  document.getElementById("world").textContent = s.world ? "live" : "waiting for world";
-  document.getElementById("chatstate").textContent = s.chat ? "connected" : "waiting for chat server";
+  document.getElementById("world").textContent = s.world ? "" : "waiting for world";
+  document.getElementById("chatstate").textContent = s.chat ? "" : "waiting for chat server";
   if (s.chat && s.chat !== CHAT_TOPIC) { CHAT_TOPIC = s.chat; if (wireSource) watchWire(); }
 }
 // ---- the live stream ----------------------------------------------------------
@@ -727,7 +750,7 @@ function setStatus(s) {
 // rebuilds from the replay when shown.
 var live = null, liveTimer = null, useSSE = false;
 var conn = document.getElementById("conn"), connhelp = document.getElementById("connhelp");
-function setConn(text, help) { conn.textContent = text; connhelp.textContent = help || ""; }
+function setConn(text, help) { conn.textContent = text === "live" ? "" : text; connhelp.textContent = help || ""; }
 function handle(data) {
   var d = JSON.parse(data);
   if (d.kind === "chat") { addMessage(d); return; }

@@ -1,5 +1,5 @@
 # The robots package: every interface module keeps the contract, its
-# virtual robot implements every function, and its twin dead reckons.
+# virtual robot implements every function, and its replica dead reckons.
 # No Aiko process: the body records the world calls it would make.
 
 import inspect
@@ -71,7 +71,7 @@ def test_module_contract(name):
     assert match is None or (isinstance(match, dict) and (match.get("name") or match.get("protocol")))
     if module.STATUS == base.STATUS_REAL:
         assert match, "a real interface says how to find the real robot"
-        assert callable(getattr(module, "observe", None)), "a real interface dead reckons its twin"
+        assert callable(getattr(module, "observe", None)), "a real interface dead reckons its replica"
 
 
 def test_kinds_and_resolution():
@@ -85,7 +85,7 @@ def test_kinds_and_resolution():
         robots.resolve("pi", "xgo_robot")
     with pytest.raises(ValueError):
         robots.resolve("submarine", None)
-    assert robots.twin_kind("irobot") == "irobot" and robots.twin_kind("xgo_robot") == "xgo"
+    assert robots.replica_kind("irobot") == "irobot" and robots.replica_kind("xgo_robot") == "xgo"
     for kind in robots.describe_kinds():
         assert kind["interfaces"][0] == kind["interface"]
         assert kind["sprite"] and kind["axes"] in (0, 1, 2, 3)
@@ -137,7 +137,7 @@ def test_irobot_as_it_is():
     for word in ("power_off", "e_stop 1", "terminate", "reset_pose"):
         method, error = module.parse_command(word)
         assert method is None or method != "power_off", word
-    # dead reckoning for the twin: in commands move it, an out pose wins
+    # dead reckoning for the replica: in commands move it, an out pose wins
     state = {}
     assert robots.observe("irobot", "in", "move", ["1"], state) == [("move", 100.0, 0.0, 0.0)]
     assert robots.observe("irobot", "in", "turn", ["-45"], state) == [("turn", -45.0)]

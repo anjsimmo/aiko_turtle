@@ -25,14 +25,14 @@
 #                {"name": ..., "protocol": ...} (either may be omitted);
 #                None = nothing physical speaks it yet
 #   observe(direction, command, args, state) -> [op, ...]   (optional)
-#                dead reckoning for the twin of a real robot: what a
+#                dead reckoning for the replica of a real robot: what a
 #                message on its "in" or "out" topic says about its pose;
 #                ops: ("move", fwd, left, up) ("turn", deg) ("place", x, y, h)
 #                ("drive", linear, angular, seconds) ("stop",) ("pen", bool)
 #   KINDS        {kind: {label, description, axes, sprite?}} bodies this
 #                module introduces (optional)
 #   FITS         [kind, ...] other kinds that may choose this interface
-#   DEFAULT_KIND the body a twin gets (default: the first of KINDS)
+#   DEFAULT_KIND the body a replica gets (default: the first of KINDS)
 #   tags(kind)   extra Registrar tags for a virtual robot (optional)
 #   supports(kind, method) -> bool  (optional; default: every method)
 
@@ -155,7 +155,7 @@ def describe_interface(name, kind=None):
             "units": module.UNITS, "source": getattr(module, "SOURCE", ""),
             "real": getattr(module, "MATCH", None) is not None,
             "match": getattr(module, "MATCH", None),
-            "default_kind": twin_kind(name),
+            "default_kind": replica_kind(name),
             "methods": specs,
             "commands": [{"example": example, "help": help_text}
                          for example, help_text in commands(name, kind)],
@@ -188,7 +188,7 @@ def describe_kinds():
     return result
 
 
-def twin_kind(interface):
+def replica_kind(interface):
     module = INTERFACES[interface]
     kind = getattr(module, "DEFAULT_KIND", None)
     if not kind:
@@ -200,7 +200,7 @@ def twin_kind(interface):
 
 
 def observe(interface, direction, command, args, state):
-    """Dead reckoning for a twin: [] when the module has no observe()"""
+    """Dead reckoning for a replica: [] when the module has no observe()"""
     module = INTERFACES[interface]
     watcher = getattr(module, "observe", None)
     if not watcher:

@@ -69,7 +69,7 @@ class Simulated:
 
 def observe(direction, command, args, state):
     """Optional.  What a message on the real robot's "in" or "out" topic
-    says about where it is, for its twin: see robots/__init__.py ops"""
+    says about where it is, for its replica: see robots/__init__.py ops"""
     if direction == "in" and command == "move" and args:
         return [("move", base.number(args[0]), 0.0, 0.0)]
     if direction == "in" and command == "turn" and args:

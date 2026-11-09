@@ -1,5 +1,5 @@
-# The proposed interface: the 2026-08-15 Aiko Services study-group design,
-# <Robot> composed of <Move> <Grasp> <Perceive> <Telemetry>, one aspect
+# The proposed interface: <Robot> composed of <Move> <Grasp> <Perceive>
+# <Telemetry> (interfaces.py), one aspect
 # tag per Interface ("move=0").  Nothing physical speaks it yet: it is
 # what the virtual robots speak by default, and one proposal for what a
 # future real robot could speak.  The real ones (irobot.py, xgo_robot.py,
@@ -11,15 +11,15 @@ from robots import base
 from interfaces import Grasp, Move, Perceive, Telemetry
 
 NAME = "proposed"
-LABEL = "Proposed: Move / Grasp / Perceive / Telemetry (2026-08 design)"
-DESCRIPTION = ("the study group's 2026-08-15 design: move takes a vector in "
-               "the robot's own frame (forward [left [up]]), turn is degrees "
-               "counter-clockwise; one aspect tag per Interface. A proposal: "
+LABEL = "Proposed: Move / Grasp / Perceive / Telemetry"
+DESCRIPTION = ("move takes a vector in the robot's own frame (forward [left "
+               "[up]]), turn is degrees counter-clockwise, grasp / release, "
+               "snapshot, telemetry; one aspect tag per Interface. A proposal: "
                "no physical robot speaks it yet")
 STATUS = base.STATUS_PROPOSED
 PROTOCOL = "ai.hashtag.ai/chat_robot:0"
 UNITS = "world units (cm) and degrees"
-SOURCE = "2026-08-15 Aiko Services Study Group: Squad Design (interfaces.py)"
+SOURCE = "interfaces.py"
 MATCH = None
 
 # The bodies that speak it by default, and which aspects each has

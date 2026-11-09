@@ -4,7 +4,7 @@
 # It is itself an Aiko Actor: it mirrors the VirtualWorld's "robots.*"
 # share, follows the chat channel like "aiko_chat repl", hosts a virtual
 # robot Actor for every robot created through the REST API, and hosts a
-# TWIN for every real robot it finds in the Registrar (robots/NAME.py says
+# REPLICA for every real robot it finds in the Registrar (robots/NAME.py says
 # how each real one is recognised), so real robots show on the map and
 # answer in the chat too.
 #
@@ -32,14 +32,14 @@ from aiko_chat.protocol import _decode_message
 
 import config
 import robots as registry
-from robot import SANDBOX_TAG, ChatRobotBase, host_robot, host_twin
+from robot import SANDBOX_TAG, ChatRobotBase, host_robot, host_replica
 from virtual_world import VirtualWorld
 from webapp import BackendError, EventHub, create_app
 from world_model import parse_pose_text
 
 _REQUEST_TIMEOUT = 5.0
 _HOST = "web"                   # "host" of robots created through REST
-_TWIN = "twin"                  # "host" of the replica of a real robot
+_REPLICA = "replica"                  # "host" of the replica of a real robot
 _MQTT_TOPIC_LIMIT = 64          # distinct topic patterns /api/mqtt may watch
 
 
@@ -104,7 +104,7 @@ class AikoBackend(aiko.Actor):
         self.mqtt_lock = threading.Lock()
         self.hosted = {}            # robot name -> virtual robot Actor (ours)
         self.external = {}          # robot name -> topic path, other people's processes
-        self.twins = {}             # robot name -> twin Actor (ours), real robot present
+        self.replicas = {}             # robot name -> replica Actor (ours), real robot present
         self.real = {}              # real robot topic path -> (robot name, interface)
         self.records = {}           # robot name -> last pose from the share
         self.process_prefix = self.topic_path.rsplit("/", 1)[0] + "/"
@@ -121,7 +121,7 @@ class AikoBackend(aiko.Actor):
             self._chat_add_handler, self._chat_remove_handler)
         # Every Service: virtual robots in other people's processes (then
         # this process stops speaking for them), and REAL robots, which
-        # get a twin here.  Tags are matched by hand: the filter would
+        # get a replica here.  Tags are matched by hand: the filter would
         # need one filter per module
         aiko.do_discovery(
             ChatRobotBase, aiko.ServiceFilter("*", "*", "*", "*", "*", "*"),
@@ -146,19 +146,19 @@ class AikoBackend(aiko.Actor):
                 self._post_message(ActorTopic.IN, "unhost", [name])
             return
         if SANDBOX_TAG in tags:
-            return                      # another sandbox's twin or web server
+            return                      # another sandbox's replica or web server
         interface = real_robot_interface(service_details, self.world_name)
         if interface:
             print(f"WEB: real robot {name} at {topic_path} speaks {interface}",
                   flush=True)
-            self._post_message(ActorTopic.IN, "twin", [name, interface, topic_path])
+            self._post_message(ActorTopic.IN, "replica", [name, interface, topic_path])
 
     def _service_remove_handler(self, service_details):
         topic_path, name = service_details[0], service_details[1]
         if topic_path.startswith(self.process_prefix):
             return
         if topic_path in self.real:
-            self._post_message(ActorTopic.IN, "untwin", [topic_path])
+            self._post_message(ActorTopic.IN, "drop_replica", [topic_path])
             return
         if self.external.get(name) != topic_path:
             return
@@ -211,8 +211,8 @@ class AikoBackend(aiko.Actor):
             self.hub.publish_robot(dict(pose, name=name, online=self.online(name, pose)))
 
     def online(self, name, pose):
-        """A twin is online while its real robot is in the Registrar"""
-        return name in self.twins if pose.get("host") == _TWIN else True
+        """A replica is online while its real robot is in the Registrar"""
+        return name in self.replicas if pose.get("host") == _REPLICA else True
 
     # -- requests to the world, from the HTTP threads -----------------------
 
@@ -274,8 +274,8 @@ class AikoBackend(aiko.Actor):
     def topic_path_of(self, name):
         if name in self.hosted:
             return self.hosted[name].topic_path
-        if name in self.twins:
-            return self.twins[name].topic_path
+        if name in self.replicas:
+            return self.replicas[name].topic_path
         return self.external.get(name)
 
     # -- Backend methods (webapp.py) ------------------------------------------
@@ -283,7 +283,7 @@ class AikoBackend(aiko.Actor):
     def status(self):
         return {"world": self.world is not None,
                 "chat": self.chat_topic, "hosted": sorted(self.hosted),
-                "twins": sorted(self.twins)}
+                "replicas": sorted(self.replicas)}
 
     def list_robots(self):
         return [self._robot(row) for row in
@@ -302,8 +302,8 @@ class AikoBackend(aiko.Actor):
         robot = self._robot(self._request(lambda world, topic:
             world.create_robot(name, kind, owner, _HOST, topic, x, y, heading,
                                interface, ""))[0])
-        if robot.get("host") == _TWIN:
-            return robot                # it existed already, as a twin
+        if robot.get("host") == _REPLICA:
+            return robot                # it existed already, as a replica
         self._post_message(ActorTopic.IN, "host", [name, kind, owner, interface])
         return robot
 
@@ -328,7 +328,7 @@ class AikoBackend(aiko.Actor):
     def command(self, name, chat_command, username):
         """Any chat command over REST: a remote call on the robot's own
         Actor (virtual, hosted here or in someone else's process; or the
-        twin of a real robot, which forwards it)"""
+        replica of a real robot, which forwards it)"""
         topic_path = self.topic_path_of(name)
         if not topic_path:
             raise BackendError(404, f"unknown robot {name}, or it has no "
@@ -346,7 +346,7 @@ class AikoBackend(aiko.Actor):
         robot = self.pose(name)
         interface = robot.get("interface", registry.default_interface(robot["kind"]))
         info = dict(robot, spec=registry.describe_interface(interface, robot["kind"]))
-        if robot.get("host") == _TWIN:
+        if robot.get("host") == _REPLICA:
             info["real_topic_path"] = robot.get("source") or None
         return info
 
@@ -508,7 +508,7 @@ class AikoBackend(aiko.Actor):
     # -- hosting robot Actors (Actor thread) --------------------------------
 
     def host(self, name, kind="turtle", owner="anonymous", interface=""):
-        if name not in self.hosted and name not in self.twins:
+        if name not in self.hosted and name not in self.replicas:
             try:
                 self.hosted[name] = host_robot(
                     name, kind, owner, self.channel, self.world_name,
@@ -524,27 +524,27 @@ class AikoBackend(aiko.Actor):
             robot.detach()
             print(f"WEB: released @@{name}", flush=True)
 
-    def twin(self, name, interface, source):
-        """A real robot appeared: host its twin.  Its sandbox name is its
+    def replica(self, name, interface, source):
+        """A real robot appeared: host its replica.  Its sandbox name is its
         registered name, unless a virtual robot already has that name"""
         if source in self.real:
             return
         host = source.split("/")[1] if source.count("/") > 1 else "real"
         record = self.records.get(name)
-        if record and record.get("host") != _TWIN:
+        if record and record.get("host") != _REPLICA:
             name = f"{name}_{host}"
         self.real[source] = (name, interface)
-        self.twins[name] = host_twin(name, interface, source,
+        self.replicas[name] = host_replica(name, interface, source,
                                      channel=self.channel, world_name=self.world_name)
-        print(f"WEB: twin @@{name} of {source} ({interface})", flush=True)
+        print(f"WEB: replica @@{name} of {source} ({interface})", flush=True)
 
-    def untwin(self, source):
+    def drop_replica(self, source):
         name, _ = self.real.pop(source, (None, None))
-        twin = self.twins.pop(name, None)
-        if twin:
-            twin.twin_detach()
-            twin.detach()
-            print(f"WEB: real robot {source} gone, twin @@{name} offline", flush=True)
+        replica = self.replicas.pop(name, None)
+        if replica:
+            replica.replica_detach()
+            replica.detach()
+            print(f"WEB: real robot {source} gone, replica @@{name} offline", flush=True)
             record = self.records.get(name)
             if record:
                 self.hub.publish_robot(dict(record, name=name, online=False))
@@ -552,7 +552,7 @@ class AikoBackend(aiko.Actor):
     def rehost_robots(self):
         # After a (re)connect to the world: speak for every virtual robot
         # that has no live process of its own (a later discovery of one
-        # unhosts).  Twins are hosted only while their real robot is
+        # unhosts).  Replicas are hosted only while their real robot is
         try:
             robots = self.list_robots()
         except BackendError as error:
@@ -560,7 +560,7 @@ class AikoBackend(aiko.Actor):
             return
         for robot in robots:
             name = robot["name"]
-            if robot.get("host") == _TWIN:
+            if robot.get("host") == _REPLICA:
                 continue
             if name not in self.external and name not in self.hosted:
                 self._post_message(ActorTopic.IN, "host",

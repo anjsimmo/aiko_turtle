@@ -252,7 +252,7 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
             "Virtual robots in a shared world, each speaking the interface "
             "of a real robot (or a proposed one), driven over REST here or "
             "over Aiko Chat (`@@name move 100` in the channel).  Real robots "
-            "found in the Registrar appear as twins.  Create a robot with any "
+            "found in the Registrar appear as replicas.  Create a robot with any "
             "name; a longer, unusual name is less likely to clash with "
             "someone else's.  Live poses and chat: GET /events (SSE).  The "
             "human guide, with Aiko and REST examples: /guide."
@@ -381,7 +381,7 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
             task.cancel()
             hub.unsubscribe(client)
 
-    @app.get("/api/status", tags=["world"])
+    @app.get("/api/status", tags=["system"])
     def status():
         status = dict(call(backend.status), auth=bool(api_token),
                       channel=channel, agent=agent, title=title,
@@ -461,8 +461,8 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
     @app.get("/api/robots", tags=["robots"])
     def list_robots():
         """Every robot: pose, kind, interface, host (web: hosted here,
-        external: someone's own process, twin: a real robot's replica),
-        online (false: a twin whose real robot is away), topic_path"""
+        external: someone's own process, replica: a real robot's replica),
+        online (false: a replica whose real robot is away), topic_path"""
         return call(backend.list_robots)
 
     @app.post("/api/robots", tags=["robots"], status_code=201,
@@ -513,14 +513,14 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         return {"name": name, "interface": interface, "method": method,
                 "arguments": arguments, "payload": payload,
                 "topic": f"{topic_path}/in" if topic_path else None,
-                "twin": info.get("host") == "twin", "python": python}
+                "replica": info.get("host") == "replica", "python": python}
 
     @app.delete("/api/robots/{name}", tags=["robots"], dependencies=write)
     def destroy_robot(name: str):
         check_name(name)
         return call(backend.destroy_robot, name)
 
-    @app.post("/api/robots/{name}/move", tags=["sandbox"], dependencies=write)
+    @app.post("/api/robots/{name}/move", tags=["robots"], dependencies=write)
     def move(name: str, body: MoveRequest):
         """The sandbox's hand, not the robot's interface: move the body
         in world units whatever it speaks.  distance 100 = forward;
@@ -532,13 +532,13 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
             raise HTTPException(422, "distance: a number or 1 to 3 numbers")
         return call(backend.move, name, body.distance, body.username)
 
-    @app.post("/api/robots/{name}/turn", tags=["sandbox"], dependencies=write)
+    @app.post("/api/robots/{name}/turn", tags=["robots"], dependencies=write)
     def turn(name: str, body: TurnRequest):
         """The sandbox's hand: turn the body, degrees counter-clockwise"""
         check_name(name)
         return call(backend.turn, name, body.angle, body.username)
 
-    @app.post("/api/robots/{name}/reset", tags=["sandbox"], dependencies=write)
+    @app.post("/api/robots/{name}/reset", tags=["robots"], dependencies=write)
     def reset(name: str, body: Optional[ResetRequest] = None):
         """Put the robot at x, y facing heading (default: the origin),
         on the ground, still.  Every kind, even one that cannot move
@@ -548,12 +548,12 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         return call(backend.reset, name, body.username, body.x, body.y,
                     body.heading)
 
-    @app.post("/api/robots/{name}/command", tags=["drive"], dependencies=write)
+    @app.post("/api/robots/{name}/command", tags=["robots"], dependencies=write)
     def command(name: str, body: CommandRequest):
         """A command in the robot's OWN interface, without the @@mention,
         exactly as the chat takes it: move 100 (proposed), move 0.2
         (irobot), action sit (xgo_robot), forward 100 (turtle_robot);
-        "help" lists them.  A twin forwards it to the real robot.  The
+        "help" lists them.  A replica forwards it to the real robot.  The
         reply comes back here as well as in the chat; a command the
         interface lacks is a 422 with the robot's explanation"""
         check_name(name)

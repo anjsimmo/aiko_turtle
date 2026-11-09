@@ -20,7 +20,7 @@ robots = Table("robots", metadata,
     Column("interface", String(32), nullable=False, default="proposed"),
     Column("owner", String(64), nullable=False, default="anonymous"),
     Column("host", String(32), nullable=False, default="external"),
-    Column("source", String(128), nullable=False, default=""),   # a twin: the real robot's topic path
+    Column("source", String(128), nullable=False, default=""),   # a replica: the real robot's topic path
     Column("x", Float, nullable=False, default=0.0),
     Column("y", Float, nullable=False, default=0.0),
     Column("heading", Float, nullable=False, default=0.0),

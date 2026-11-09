@@ -69,9 +69,9 @@ def test_errors():
 
 def test_pose_text_round_trip():
     record = {"x": 1.5, "y": -2.0, "heading": 270.0, "kind": "xgo", "z": 4.0,
-              "pen": 0, "interface": "xgo_robot", "host": "twin", "moving": True}
+              "pen": 0, "interface": "xgo_robot", "host": "replica", "moving": True}
     assert pose_text(record) == \
-        "(1.500 -2.000 270.000 xgo 4.000 up xgo_robot twin moving)"
+        "(1.500 -2.000 270.000 xgo 4.000 up xgo_robot replica moving)"
     assert parse_pose_text(pose_text(record)) == record
     assert parse_pose_text(["1", "2", "3"]) == \
         {"x": 1.0, "y": 2.0, "heading": 3.0, "kind": "turtle", "z": 0.0,
@@ -141,10 +141,10 @@ def test_drive_integrates_until_stopped():
 
 def test_pen_and_interface_and_host():
     world = World("sqlite://")
-    robot = world.create("r", kind="irobot", interface="irobot", host="twin",
+    robot = world.create("r", kind="irobot", interface="irobot", host="replica",
                          source="aiko/zebra2/1/1")
     assert (robot["interface"], robot["host"], robot["source"]) == \
-        ("irobot", "twin", "aiko/zebra2/1/1")
+        ("irobot", "replica", "aiko/zebra2/1/1")
     with pytest.raises(WorldError):
         world.create("x", kind="pi", interface="xgo_robot")   # a Pi cannot be a dog
     assert world.set_pen("r", False)["pen"] == 0

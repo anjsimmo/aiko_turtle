@@ -4,26 +4,26 @@
 # when one connects, without the robot.  It registers with the Registrar
 # exactly as the real robot's software does (same protocol, same name,
 # same functions on its "in" topic, taken from robots/NAME.py), so the
-# sandbox makes a twin of it.  What it does with telemetry is yours to
+# sandbox makes a replica of it.  What it does with telemetry is yours to
 # choose, because that is what differs most between real robots:
 #
 #   --telemetry none   says nothing about where it is (an XGO, a LoliBot):
-#                      the twin can only dead reckon from the commands
+#                      the replica can only dead reckon from the commands
 #   --telemetry pose   reports (pose X Y HEADING) on "out" every --period
 #                      seconds in the interface's units (the iRobot's
-#                      format): the twin snaps to it
+#                      format): the replica snaps to it
 #   --telemetry odd    reports in a format the sandbox does not know
-#                      (a JSON odometry blob): the twin must ignore it
+#                      (a JSON odometry blob): the replica must ignore it
 #   --drift PERCENT    the robot really moves PERCENT of what it was told
-#                      (slipping wheels): with "pose" the twin corrects,
+#                      (slipping wheels): with "pose" the replica corrects,
 #                      with "none" it drifts away from the truth
 #   --echo / --no-echo echo each command on "out", as the XGO does
 #
 # By default it is tagged world=TURTLE_WORLD so that only YOUR sandbox
-# (the one whose world has that name) twins it; a real robot has no such
-# tag and every sandbox on the broker twins it.  --like-real drops the tag
+# (the one whose world has that name) replicas it; a real robot has no such
+# tag and every sandbox on the broker replicas it.  --like-real drops the tag
 # to behave exactly like the real thing (then the production sandbox will
-# twin it too: use a name nobody will mistake).
+# replica it too: use a name nobody will mistake).
 #
 # Usage (with env.sh sourced; the dev names of README "Run it locally"):
 #   ./tools/fake_robot.py xgo_robot --name devxgo_anj
@@ -31,7 +31,7 @@
 #   ./tools/fake_robot.py irobot --telemetry odd
 #   ./tools/fake_robot.py turtle_robot --name my_turtle_anj
 #   ./tools/fake_robot.py lolibot --telemetry none --no-echo
-# Then drive the twin on the page (or send to its "in" topic from the
+# Then drive the replica on the page (or send to its "in" topic from the
 # mqtt layer) and watch this process print what arrived.
 
 import json
@@ -166,8 +166,8 @@ def make_actor(module, name, telemetry, period, echo, drift, world_tag):
 @click.option("--drift", default=100.0, show_default=True,
               help="percent of each commanded motion that really happens")
 @click.option("--world", default=config.WORLD_NAME, show_default=True,
-              help="only the sandbox with this world name twins it")
-@click.option("--like-real", is_flag=True, help="no world tag: every sandbox twins it")
+              help="only the sandbox with this world name replicas it")
+@click.option("--like-real", is_flag=True, help="no world tag: every sandbox replicas it")
 def main(interface, name, telemetry, period, echo, drift, world, like_real):
     """A stand-in for a real robot speaking INTERFACE, registered as the
     real one would be, with the telemetry behaviour you choose"""

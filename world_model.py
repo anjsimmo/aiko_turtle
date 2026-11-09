@@ -71,7 +71,7 @@ class World:
 
     def set_host(self, name, host, source=None):
         """Who speaks for the robot: web, external (someone's own
-        process), or twin (a real robot, source = its topic path)"""
+        process), or replica (a real robot, source = its topic path)"""
         record = self._record(name)
         record["host"] = host
         if source is not None:

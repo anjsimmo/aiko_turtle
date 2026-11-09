@@ -78,5 +78,5 @@ No seconds (or 0) means run until the next command. A timed move publishes
 ## In the sandbox
 
 Once the bot registers with the Registrar (name from `configuration/services.py`,
-protocol `org.geekscape.protocol.lolibot:1`) it appears in the sandbox as a twin
+protocol `org.geekscape.protocol.lolibot:1`) it appears in the sandbox as a replica
 of the virtual LoliBot.

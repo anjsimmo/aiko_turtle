@@ -166,7 +166,7 @@ class ChatAgent(bot.ChatBot):
             robot_lines.append(
                 f"- {robot.get('botname', '@@' + robot['name'])}"
                 f" (kind {robot.get('kind', '?')}, interface {interface or '?'},"
-                f"{' a TWIN of a real robot,' if robot.get('sandbox') == 'twin' else ''}"
+                f"{' a REPLICA of a real robot,' if robot.get('sandbox') == 'replica' else ''}"
                 f" functions: {robot.get('commands', 'unknown')})")
             if interface in registry.INTERFACES and interface not in interfaces:
                 module = registry.INTERFACES[interface]
@@ -189,7 +189,7 @@ The interfaces, with example commands and what they mean:
 {interfaces_text}
 
 Every robot also takes: help, place X Y [H] (teleport, sandbox only).
-A twin forwards your command to a real robot: be careful and brief.
+A replica forwards your command to a real robot: be careful and brief.
 
 Recent channel history (oldest first):
 {history_text}

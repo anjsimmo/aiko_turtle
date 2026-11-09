@@ -5,7 +5,7 @@
 # aiko_irobot/robot.py on the Pi and not in this repo): metres, degrees
 # (+ = left), fire-and-forget commands, and four queries that reply to a
 # topic.  The real Actor echoes commands and publishes (pose x y heading)
-# and (hazard ...) on its "out" topic, which is what the twin listens to.
+# and (hazard ...) on its "out" topic, which is what the replica listens to.
 
 import time
 from abc import abstractmethod

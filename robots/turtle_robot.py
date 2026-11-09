@@ -3,7 +3,7 @@
 # *part2_robot.ipynb is it): an Actor named "turtle_robot" (renamed by
 # each student) with forward / backward / left / right / action.  A robot
 # created here with this interface answers the old part-1 notebook, and a
-# turtle run from the old part-2 notebook appears here as a twin.
+# turtle run from the old part-2 notebook appears here as a replica.
 
 import aiko_services as aiko
 from abc import abstractmethod
@@ -14,11 +14,11 @@ NAME = "turtle_robot"
 LABEL = "Legacy virtual turtle (June 2026 tutorial)"
 DESCRIPTION = ("the Colab tutorial turtle of June 2026: forward / backward in "
                "turtle steps, left / right in degrees, action penup | pendown "
-               "| forward | left | right | backward (ColabTurtlePlus)")
+               "| forward | left | right | backward")
 STATUS = base.STATUS_LEGACY
 PROTOCOL = f"{aiko.SERVICE_PROTOCOL_AIKO}/turtle_robot:0"
 UNITS = "turtle steps (1 = 1 world unit) and degrees"
-SOURCE = "old_tutorials/angie_aiko_services_chat_robot_tutorial_june_2026_part2_robot.ipynb"
+SOURCE = "examples/notebooks/ (the June 2026 tutorial, part 2)"
 MATCH = {"protocol": PROTOCOL}
 FITS = ["turtle"]
 DEFAULT_KIND = "turtle"
@@ -119,7 +119,7 @@ class Simulated:
 
 
 def observe(direction, command, args, state):
-    """A command on the real turtle's "in" topic moves the twin the same way"""
+    """A command on the real turtle's "in" topic moves the replica the same way"""
     if direction != "in" or command not in ("action", "forward", "backward", "left", "right"):
         return []
     return _ops(command, args[0] if args else "")

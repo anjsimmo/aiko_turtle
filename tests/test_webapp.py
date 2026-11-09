@@ -43,7 +43,7 @@ class FakeBackend:
         robot = self.pose(name)
         info = dict(robot, spec=kinds.describe_interface(robot["interface"], robot["kind"]),
                     topic_path=f"aiko/fake/1/{name}")
-        if robot["host"] == "twin":
+        if robot["host"] == "replica":
             info["real_topic_path"] = robot["source"]
         return info
 

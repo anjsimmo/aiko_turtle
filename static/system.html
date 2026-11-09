@@ -30,7 +30,10 @@ main { width:min(100%,1100px); display:grid; gap:16px; }
 .panel h2 { font-family:"Sora",sans-serif; font-size:0.95rem; margin:0 0 10px; }
 .panel p { margin:6px 0; color:var(--muted); }
 table { border-collapse:collapse; width:100%; font-size:0.76rem; }
-th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-all; }
+th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
+th { white-space:nowrap; }
+td.tags { word-break:break-all; } td.nowrap { white-space:nowrap; }
+.scroll { max-width:100%; overflow-x:auto; }
 th { color:var(--muted); font-weight:500; }
 td.tags { color:var(--muted); font-size:0.7rem; }
 pre { background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:10px; overflow-x:auto; font-size:0.76rem; margin:8px 0; }
@@ -77,9 +80,9 @@ a { color:var(--accent); }
 </section>
 <section class="panel">
   <h2>Registrar: who is running <span class="hint" id="cache"></span></h2>
-  <p>Every Service that has registered: the ProcessManager that keeps the 24x7 services up, the HyperSpace, the ChatServer, the world, each virtual robot (one Service per robot, tagged <code>sandbox=virtual</code>, <code>interface=…</code> and one <code>move=0</code>-style tag per Interface), the twins of real robots (<code>sandbox=twin</code>), the LLM agent, and anyone who connects. A row marked <em>real robot</em> is a physical robot's own Service, recognised by the name or protocol its interface module in <code>robots/</code> matches; the sandbox makes a twin of it on the map.</p>
+  <p>Every Service that has registered: the ProcessManager that keeps the 24x7 services up, the HyperSpace, the ChatServer, the world, each virtual robot (one Service per robot, tagged <code>sandbox=virtual</code>, <code>interface=…</code> and one <code>move=0</code>-style tag per Interface), the replicas of real robots (<code>sandbox=replica</code>), the LLM agent, and anyone who connects. A row marked <em>real robot</em> is a physical robot's own Service, recognised by the name or protocol its interface module in <code>robots/</code> matches; the sandbox makes a replica of it on the map.</p>
   <p id="realrobots"></p>
-  <table id="services"><thead><tr><th>topic path</th><th>name</th><th>protocol</th><th>owner</th><th>tags</th></tr></thead><tbody></tbody></table>
+  <div class="scroll"><table id="services"><thead><tr><th>topic</th><th>name</th><th>protocol</th><th>owner</th><th>tags</th></tr></thead><tbody></tbody></table></div>
 </section>
 </main>
 <script>
@@ -186,13 +189,13 @@ function render() {
         if (watching) startWatch(svc.topic_path + "/#");
         document.getElementById("watchpanel").scrollIntoView({ behavior: "smooth" });
       });
-      tp.append(a); cell(tr, svc.name + (svc.real_robot ? "  [real robot: " + svc.real_robot + "]" : "")); cell(tr, svc.protocol); cell(tr, svc.owner); cell(tr, (svc.tags || []).join(" "), "tags");
+      tp.append(a); cell(tr, svc.name + (svc.real_robot ? "  [real robot: " + svc.real_robot + "]" : "")); cell(tr, svc.protocol); cell(tr, svc.owner, "nowrap"); cell(tr, (svc.tags || []).join(" "), "tags");
       if (svc.real_robot) tr.style.fontWeight = "500";
       st.append(tr);
     });
     var real = s.real_robots || [];
     document.getElementById("realrobots").textContent = real.length
-      ? "real robots on the broker now: " + real.map(function (r) { return r.name + " (" + r.interface + ", " + r.topic_path + ")"; }).join(";  ") + ". Each has a twin on the map; untick \"show real robots\" on the home page to hide them."
+      ? "real robots on the broker now: " + real.map(function (r) { return r.name + " (" + r.interface + ", " + r.topic_path + ")"; }).join(";  ") + ". Each has a replica on the map; untick \"show real robots\" on the home page to hide them."
       : "no real robot is on the broker right now (the sandbox watches for the names and protocols listed under /api/interfaces).";
   });
 }

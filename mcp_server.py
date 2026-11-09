@@ -37,7 +37,7 @@ mcp = FastMCP("aiko_turtle",
         "commands of each interface, list_kinds for the bodies, create_robot "
         "to add one, command to drive it in its own words (move 0.2 for an "
         "irobot, action sit for an xgo_robot), and chat to talk in the "
-        "#robots channel where humans and other agents are. Twins of real "
+        "#robots channel where humans and other agents are. Replicas of real "
         "robots forward your commands to the real one. Say who you are: "
         "bots are named @@name."))
 
