@@ -433,30 +433,71 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         call(backend.mqtt_publish, body.topic, body.payload)
         return {"published": True, "topic": body.topic}
 
-    @app.get("/api/mqtt/events", tags=["mqtt"], dependencies=write)
-    async def mqtt_events(request: Request, topic: str):
-        """The same as a stream of server-sent events, until you hang up:
-        curl -N '.../api/mqtt/events?topic=aiko/%23&token=...'
-        Up to four topics, comma separated, share one stream"""
+    def watch_topics(topic, client):
+        """Subscribe client to up to four comma-separated topics; returns
+        the function that unsubscribes them all"""
         topics = [part.strip() for part in topic.split(",") if part.strip()][:4]
         if not topics:
             raise HTTPException(422, "topic required")
-        client = _AsyncClient(asyncio.get_running_loop())
         subscribed = []
-        try:
-            for one in topics:
-                call(backend.mqtt_subscribe, one, client)
-                subscribed.append(one)
-        except HTTPException:
-            for one in subscribed:
-                backend.mqtt_unsubscribe(one, client)
-            raise
 
         def cleanup():
             for one in subscribed:
                 backend.mqtt_unsubscribe(one, client)
 
+        try:
+            for one in topics:
+                call(backend.mqtt_subscribe, one, client)
+                subscribed.append(one)
+        except HTTPException:
+            cleanup()
+            raise
+        return cleanup
+
+    @app.get("/api/mqtt/events", tags=["mqtt"], dependencies=write)
+    async def mqtt_events(request: Request, topic: str):
+        """The same as a stream of server-sent events, until you hang up:
+        curl -N '.../api/mqtt/events?topic=aiko/%23&token=...'
+        Up to four topics, comma separated, share one stream.  The page
+        uses the WebSocket at /ws/mqtt (same query, same messages) because
+        a browser holds only a few HTTP connections per site"""
+        client = _AsyncClient(asyncio.get_running_loop())
+        cleanup = watch_topics(topic, client)
         return sse(request, client, [], cleanup)
+
+    @app.websocket("/ws/mqtt")
+    async def mqtt_ws(websocket: WebSocket, topic: str = "", token: str = ""):
+        # /api/mqtt/events as a WebSocket: one JSON text message per MQTT
+        # message.  Accepted first, so a bad token, topic or a server not
+        # yet connected is told as {"error": ..., "status": ...} and then
+        # a close (code 4000 + status): a handshake refused outright would
+        # look, to the page, like a proxy without WebSockets
+        await websocket.accept()
+        client = _AsyncClient(asyncio.get_running_loop())
+        try:
+            if api_token and token != api_token:
+                raise HTTPException(401, "bearer token required (see /guide)")
+            cleanup = watch_topics(topic, client)
+        except HTTPException as error:
+            await websocket.send_text(json.dumps(
+                {"error": error.detail, "status": error.status_code}))
+            await websocket.close(code=4000 + error.status_code)
+            return
+
+        async def sender():
+            while True:
+                event = await client.queue.get()
+                await websocket.send_text(json.dumps(event))
+
+        task = asyncio.create_task(sender())
+        try:
+            while True:
+                await websocket.receive_text()     # raises on close
+        except Exception:
+            pass
+        finally:
+            task.cancel()
+            cleanup()
 
     @app.get("/api/robots", tags=["robots"])
     def list_robots():

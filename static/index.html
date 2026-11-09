@@ -736,18 +736,42 @@ function watchWire() {
   if (AUTH && !t) { wirelog.textContent = "token needed: see the lock at the top"; return; }
   if (!document.getElementById("topic").value) document.getElementById("topic").value = (info.real_topic_path || info.topic_path || "") + "/in";
   wirelog.textContent = ""; wireLines = 0;
-  wireSource = new EventSource("/api/mqtt/events?topic=" + encodeURIComponent(topics.join(",")) + (t ? "&token=" + encodeURIComponent(t) : ""));
-  wireSource.onmessage = function (ev) {
-    var m = JSON.parse(ev.data), leaf = m.topic.split("/").pop(), line = document.createElement("div");
+  wireSource = watchTopics(topics.join(","), t, function (m) {
+    var leaf = m.topic.split("/").pop(), line = document.createElement("div");
     var ts = document.createElement("span"); ts.className = "t"; ts.textContent = new Date(m.timestamp * 1000).toTimeString().slice(0, 8) + "  ";
     var tp = document.createElement("span"); tp.className = leaf === "in" ? "in" : leaf === "out" || leaf === "world_response" ? "out" : ""; tp.textContent = m.topic + "  ";
     line.append(ts, tp, m.payload); wirelog.append(line);
     if (++wireLines > 200) { wirelog.firstChild.remove(); }
     wirelog.scrollTop = wirelog.scrollHeight;
-  };
-  wireSource.onerror = function () {            // a 503 while the server is still connecting: try again shortly
-    if (wireSource && wireSource.readyState === EventSource.CLOSED) { wirelog.textContent += "\n(stream closed, retrying)"; wireSource = null; setTimeout(watchWire, 3000); }
-  };
+  }, function (error) {                         // e.g. a 503 while the server is still connecting: try again shortly
+    wirelog.textContent += "\n(stream closed" + (error ? ": " + error : "") + ", retrying)"; wireSource = null; setTimeout(watchWire, 3000);
+  });
+}
+// A topic stream: the WebSocket at /ws/mqtt first (not counted against the
+// browser's few HTTP connections per site), else the server-sent events at
+// /api/mqtt/events.  onclosed() when the server refused or dropped it
+var wireUseSSE = false;
+function watchTopics(topic, token, onmessage, onclosed) {
+  var query = "?topic=" + encodeURIComponent(topic) + (token ? "&token=" + encodeURIComponent(token) : ""), stream = {};
+  if (!wireUseSSE && "WebSocket" in window) {
+    var ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/mqtt" + query);
+    var opened = false, error = "";
+    stream.close = function () { ws.onclose = null; ws.close(); };
+    ws.onopen = function () { opened = true; };
+    ws.onmessage = function (ev) { var m = JSON.parse(ev.data); if (m.error) error = m.error; else onmessage(m); };
+    ws.onerror = function () {};
+    ws.onclose = function () {
+      // never opened: no WebSocket through this proxy, so the SSE stream from now on
+      if (!opened && !wireUseSSE) { wireUseSSE = true; var es = watchTopics(topic, token, onmessage, onclosed); stream.close = es.close; return; }
+      onclosed(error);
+    };
+    return stream;
+  }
+  var source = new EventSource("/api/mqtt/events" + query);
+  stream.close = function () { source.close(); };
+  source.onmessage = function (ev) { onmessage(JSON.parse(ev.data)); };
+  source.onerror = function () { if (source.readyState === EventSource.CLOSED) onclosed(""); };
+  return stream;
 }
 
 function setStatus(s) {

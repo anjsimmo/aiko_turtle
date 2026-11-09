@@ -156,7 +156,11 @@ and what each can do; `GET /api/chat/channels` the channels. With the
 token, `/api/mqtt` watches a topic, streams one, or publishes to one, so
 any Aiko Service can be called from a language with no Aiko client yet
 (`/guide` has the three curl lines). The page's live stream is a
-WebSocket at `/ws`; `/events` is the same as server-sent events.
+WebSocket at `/ws`; `/events` is the same as server-sent events. Likewise
+the wire: `/ws/mqtt?topic=...&token=...` for the pages, `/api/mqtt/events`
+for `curl -N`. The pages prefer WebSockets because a browser allows only
+about six HTTP/1.1 connections per site and a server-sent-events stream
+holds one for as long as the tab is open; a WebSocket is not counted.
 
 **Chat** (the page, `aiko_chat repl` after `:cc robots`, or
 `aiko_chat send robots "..."`):

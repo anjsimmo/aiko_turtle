@@ -292,3 +292,19 @@ def test_mqtt_events_many_topics(client):
             if len(lines) == 2:
                 break
         assert "aiko/a/#" in lines[0] and "aiko/b/#" in lines[1]
+
+
+def test_mqtt_websocket(client):
+    # The pages' wire stream: the same messages as /api/mqtt/events
+    with client.websocket_connect("/ws/mqtt?topic=aiko/a/%23,aiko/b/%23") as ws:
+        assert ws.receive_json()["topic"] == "aiko/a/#"
+        assert ws.receive_json()["topic"] == "aiko/b/#"
+    # Refusals come after the handshake, as a message then a close code,
+    # so the page can tell "bad token" from "no WebSockets here"
+    with client.websocket_connect("/ws/mqtt?topic=") as ws:
+        assert ws.receive_json() == {"error": "topic required", "status": 422}
+    private = TestClient(create_app(FakeBackend(), api_token="tok"))
+    with private.websocket_connect("/ws/mqtt?topic=aiko/%23&token=no") as ws:
+        assert ws.receive_json()["status"] == 401
+    with private.websocket_connect("/ws/mqtt?topic=aiko/%23&token=tok") as ws:
+        assert ws.receive_json()["topic"] == "aiko/#"

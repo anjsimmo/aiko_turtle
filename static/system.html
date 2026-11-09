@@ -116,8 +116,10 @@ function hms(ts) {
   var d = new Date(typeof ts === "number" && ts < 1e12 ? ts * 1000 : ts);
   return isNaN(d) ? "--:--:--" : d.toTimeString().slice(0, 8);
 }
-// Live: a server-sent-events stream of the topic, until stopped.  The
-// token goes in the URL because EventSource cannot send headers
+// Live: a stream of the topic, until stopped: the WebSocket at /ws/mqtt
+// (not counted against the browser's few HTTP connections per site), else
+// the server-sent events at /api/mqtt/events.  The token goes in the URL
+// because neither can send headers
 var watching = null, watchLines = 0;
 var watchOut = document.getElementById("watchout"), watchState = document.getElementById("watchstate"), watchBtn = document.getElementById("watchbtn");
 function stopWatch() {
@@ -130,20 +132,39 @@ function startWatch(topic) {
   if (!t && lock.className.indexOf("show") >= 0) { watchOut.textContent = needToken(); return; }
   watchOut.textContent = ""; watchLines = 0;
   watchState.textContent = "connecting to " + topic + "\u2026";
-  watching = new EventSource("/api/mqtt/events?topic=" + encodeURIComponent(topic) + (t ? "&token=" + encodeURIComponent(t) : ""));
   watchBtn.textContent = "stop";
-  watching.onopen = function () { watchState.textContent = "streaming " + topic; };
-  watching.onerror = function () {
-    // a 401 or 422 closes the stream before it opens; EventSource gives no status, so say so
-    if (watching && watching.readyState === EventSource.CLOSED) { watchState.textContent = "stream closed: token missing or topic not under aiko/ ?"; watchBtn.textContent = "watch"; watching = null; }
-    else watchState.textContent = "reconnecting\u2026";
-  };
-  watching.onmessage = function (ev) {
-    var m = JSON.parse(ev.data);
+  watching = watchTopics(topic, t, function (m) {
+    watchState.textContent = "streaming " + topic;
     watchOut.textContent += (watchLines ? "\n" : "") + hms(m.timestamp) + "  " + m.topic + "  " + m.payload;
     if (++watchLines > 500) { var lines = watchOut.textContent.split("\n"); watchOut.textContent = lines.slice(-400).join("\n"); watchLines = 400; }
     watchOut.scrollTop = watchOut.scrollHeight;
-  };
+  }, function (error) {
+    // the WebSocket says why; an SSE stream closed before it opened does not (a 401 or 422), so guess
+    watchState.textContent = "stream closed: " + (error || "token missing or topic not under aiko/ ?"); watchBtn.textContent = "watch"; watching = null;
+  });
+}
+var wireUseSSE = false;
+function watchTopics(topic, token, onmessage, onclosed) {
+  var query = "?topic=" + encodeURIComponent(topic) + (token ? "&token=" + encodeURIComponent(token) : ""), stream = {};
+  if (!wireUseSSE && "WebSocket" in window) {
+    var ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/mqtt" + query);
+    var opened = false, error = "";
+    stream.close = function () { ws.onclose = null; ws.close(); };
+    ws.onopen = function () { opened = true; };
+    ws.onmessage = function (ev) { var m = JSON.parse(ev.data); if (m.error) error = m.error; else onmessage(m); };
+    ws.onerror = function () {};
+    ws.onclose = function () {
+      // never opened: no WebSocket through this proxy, so the SSE stream from now on
+      if (!opened && !wireUseSSE) { wireUseSSE = true; var es = watchTopics(topic, token, onmessage, onclosed); stream.close = es.close; return; }
+      onclosed(error);
+    };
+    return stream;
+  }
+  var source = new EventSource("/api/mqtt/events" + query);
+  stream.close = function () { source.close(); };
+  source.onmessage = function (ev) { onmessage(JSON.parse(ev.data)); };
+  source.onerror = function () { if (source.readyState === EventSource.CLOSED) onclosed(""); };
+  return stream;
 }
 document.getElementById("watchform").addEventListener("submit", function (e) {
   e.preventDefault();
