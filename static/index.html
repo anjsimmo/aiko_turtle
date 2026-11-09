@@ -13,38 +13,39 @@
 body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 24px;
        font-family:"IBM Plex Mono",monospace; display:flex; flex-direction:column;
        align-items:center; min-height:100vh; }
-header { width:min(100%,1240px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 4px; }
+header { width:min(100%,1280px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 4px; }
 h1 { font-family:"Sora",sans-serif; font-size:1.3rem; margin:0; }
 h1 .tag { font-family:"IBM Plex Mono",monospace; font-weight:normal; font-size:0.78rem; color:var(--muted); margin-left:10px; }
 nav { display:flex; flex-wrap:wrap; align-items:center; gap:14px; font-size:0.8rem; margin-left:auto; }
 nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { color:var(--accent); }
 #lock { display:none; align-items:center; gap:5px; background:none; color:var(--muted); border:1px solid var(--line); padding:3px 8px; font-size:0.74rem; }
 #lock.show { display:inline-flex; } #lock.open, #lock:hover { color:var(--accent); border-color:var(--accent); opacity:1; }
-#tokenbar { display:none; width:min(100%,1240px); align-items:center; gap:10px; margin:0 0 12px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); font-size:0.74rem; color:var(--muted); flex-wrap:wrap; }
+#tokenbar { display:none; width:min(100%,1280px); align-items:center; gap:10px; margin:0 0 12px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); font-size:0.74rem; color:var(--muted); flex-wrap:wrap; }
 #tokenbar.show { display:flex; }
 #tokenbar input { flex:1 1 22em; min-width:0; }
-#intro { width:min(100%,1240px); color:var(--muted); font-size:0.78rem; margin:0 0 8px; line-height:1.5; max-width:1240px; }
-#intro a { color:var(--accent); }
-#status { color:var(--muted); font-size:0.78rem; margin-bottom:14px; width:min(100%,1240px); display:flex; gap:14px; flex-wrap:wrap; }
+#status { color:var(--muted); font-size:0.78rem; margin-bottom:12px; width:min(100%,1280px); display:flex; gap:14px; flex-wrap:wrap; }
 #status .warn { color:var(--warn); }
-#grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px;
-        width:min(100%,1240px); align-items:start; }
+#status a { color:var(--accent); }
+#grid { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:16px;
+        width:min(100%,1280px); align-items:start; }
 @media (max-width: 900px) { #grid { grid-template-columns:1fr; } }
 body.view-world #grid, body.view-chat #grid { grid-template-columns:1fr; width:min(100%,900px); }
-body.view-world #status, body.view-world #tokenbar, body.view-chat #status, body.view-chat #tokenbar, body.view-world header, body.view-chat header, body.view-world #intro, body.view-chat #intro { width:min(100%,900px); }
-body.view-world #chatpanel, body.view-chat #worldpanel, body.view-world #intro, body.view-chat #intro { display:none; }
-body.view-chat #messages { height:min(70vh,900px); }
-.panel { background:var(--surface); border:1px solid var(--line); border-radius:6px;
-         padding:12px; min-width:0; }
+body.view-world #status, body.view-world #tokenbar, body.view-chat #status, body.view-chat #tokenbar, body.view-world header, body.view-chat header { width:min(100%,900px); }
+body.view-world #stack, body.view-chat #worldpanel { display:none; }
+body.view-chat #messages { height:min(60vh,800px); }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:12px; min-width:0; }
 .panel h2 { font-family:"Sora",sans-serif; font-size:0.95rem; margin:0 0 10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .panel h2 span { color:var(--muted); font-weight:normal; font-size:0.78rem; font-family:"IBM Plex Mono",monospace; }
 .panel h2 a { font-size:0.72rem; font-weight:normal; font-family:"IBM Plex Mono",monospace; margin-left:auto; }
+#mapbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:0.72rem; color:var(--muted); margin:0 0 6px; }
+#mapbar label { cursor:pointer; white-space:nowrap; }
 #zoom { display:inline-flex; gap:4px; }
 #zoom button { background:var(--surface); color:var(--ink); border:1px solid var(--line); padding:2px 8px; font-size:0.72rem; }
 #zoom button:hover { border-color:var(--accent); opacity:1; }
 #zoom button.on { border-color:var(--accent); color:var(--accent); }
-canvas { display:block; width:100%; height:auto; aspect-ratio:1/1; cursor:grab; touch-action:none; }
+canvas { display:block; width:100%; height:auto; aspect-ratio:1/1; cursor:grab; touch-action:none; border:1px solid var(--line); border-radius:4px; }
 canvas.dragging { cursor:grabbing; }
+.hintline { color:var(--muted); font-size:0.7rem; margin-top:4px; }
 #robots { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px; font-size:0.78rem; }
 #robots li { display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:4px; padding:4px 8px; cursor:pointer; }
 #robots li.selected { border-color:var(--accent); background:var(--me); }
@@ -55,64 +56,66 @@ canvas.dragging { cursor:grabbing; }
 #robots .badge.twin { color:var(--twin); background:none; border:1px dashed var(--twin); }
 #robots .badge.off { color:var(--muted); border-color:var(--muted); }
 #robots .x { color:var(--danger); background:none; border:none; padding:0 2px; font-size:0.9rem; }
-#create { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; align-items:center; }
-#create a { font-size:0.72rem; }
-#advanced { display:none; gap:6px; margin-top:6px; flex-wrap:wrap; align-items:center; font-size:0.74rem; color:var(--muted); }
-#advanced.show { display:flex; }
+#pose { color:var(--accent); font-size:0.78rem; margin-top:8px; min-height:1.2em; }
+#create { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; align-items:center; font-size:0.74rem; color:var(--muted); }
+#create label { white-space:nowrap; }
+#kindinfo { color:var(--muted); font-size:0.72rem; margin-top:6px; line-height:1.5; }
+#kindinfo code { color:var(--accent); }
 input, select { font-family:inherit; font-size:0.8rem; padding:5px 8px;
    border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
-#pose { color:var(--accent); font-size:0.8rem; margin-top:8px; min-height:1.2em; }
-#kindinfo, #iface { color:var(--muted); font-size:0.74rem; margin-top:6px; line-height:1.5; }
-#kindinfo code, #iface code { color:var(--accent); }
-#iface b { color:var(--ink); font-weight:500; }
-#iface .real { color:var(--twin); }
-#iface details { margin-top:4px; } #iface summary { cursor:pointer; }
-#iface table { border-collapse:collapse; font-size:0.7rem; margin:4px 0; }
-#iface td { padding:1px 8px 1px 0; vertical-align:top; } #iface td:first-child { color:var(--accent); white-space:nowrap; }
-.hintline { color:var(--muted); font-size:0.7rem; margin-top:4px; }
-.hintline label { cursor:pointer; }
 button { font-family:"IBM Plex Mono",monospace; font-size:0.78rem;
          background:var(--accent); color:var(--bg); border:none;
          border-radius:4px; padding:6px 12px; cursor:pointer; }
 button:hover { opacity:0.88; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--muted); outline-offset:2px; }
-#messages { list-style:none; margin:0; padding:0; height:min(45vh,420px); overflow-y:auto;
-            border:1px solid var(--line); border-radius:4px; font-size:0.82rem; }
-#messages li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:0 8px;
-               padding:6px 10px; border-bottom:1px solid var(--line); word-break:break-word; }
+/* the stack: three layers, each inspectable, each with its own way in */
+#stack { display:flex; flex-direction:column; gap:0; padding:0; overflow:hidden; }
+.layer { display:grid; grid-template-columns:5.2em minmax(0,1fr); border-top:1px solid var(--line); }
+.layer:first-child { border-top:none; }
+.layer .name { background:var(--bg); border-right:1px solid var(--line); padding:12px 8px; font-family:"Sora",sans-serif; font-size:0.85rem; color:var(--accent); display:flex; flex-direction:column; gap:6px; }
+.layer .name small { font-family:"IBM Plex Mono",monospace; font-size:0.62rem; color:var(--muted); font-weight:normal; line-height:1.4; }
+.layer .body { padding:10px 12px; min-width:0; }
+.layer .how { color:var(--muted); font-size:0.7rem; line-height:1.5; margin:0 0 8px; }
+.layer .how code { color:var(--accent); }
+.layer .arrow { text-align:center; color:var(--muted); font-size:0.7rem; padding:2px 0 0; grid-column:1 / -1; border-top:1px dashed var(--line); background:var(--bg); }
+#chathead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:0.78rem; margin:0 0 6px; }
+#chathead span { color:var(--muted); font-size:0.72rem; }
+#chathead a { font-size:0.72rem; margin-left:auto; }
+#messages { list-style:none; margin:0; padding:0; height:min(32vh,300px); overflow-y:auto; border:1px solid var(--line); border-radius:4px; font-size:0.8rem; }
+#messages li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:0 8px; padding:5px 10px; border-bottom:1px solid var(--line); word-break:break-word; }
 #messages li:last-child { border-bottom:none; }
 #messages .who { color:var(--muted); }
 #messages .bot .who { color:var(--bot); }
 #messages .me { background:var(--me); }
 #messages .me .who { color:var(--accent); }
-#messages .time { color:var(--muted); font-size:0.7rem; white-space:nowrap; }
-#empty { color:var(--muted); font-size:0.8rem; padding:10px; }
-#chips { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0; }
-#chips button { background:var(--surface); color:var(--ink); border:1px solid var(--line); }
+#messages .time { color:var(--muted); font-size:0.68rem; white-space:nowrap; }
+#empty { color:var(--muted); font-size:0.78rem; padding:10px; }
+#chips { display:flex; gap:5px; flex-wrap:wrap; margin:8px 0; }
+#chips button { background:var(--surface); color:var(--ink); border:1px solid var(--line); padding:3px 8px; font-size:0.72rem; }
 #chips button:hover { border-color:var(--accent); opacity:1; }
-#chips button:disabled { opacity:0.35; cursor:default; border-color:var(--line); }
-#layers { display:flex; gap:4px; align-items:center; font-size:0.72rem; color:var(--muted); margin:0 0 6px; flex-wrap:wrap; }
-#layers button { background:var(--surface); color:var(--muted); border:1px solid var(--line); padding:2px 9px; font-size:0.72rem; }
-#layers button.on { color:var(--accent); border-color:var(--accent); }
-#layerhelp { color:var(--muted); font-size:0.7rem; margin:0 0 6px; line-height:1.5; }
-#send { display:flex; gap:8px; flex-wrap:wrap; }
-#text, #who, #topic, #payload { font-size:0.85rem; padding:8px 10px; }
-#text { flex:1; min-width:0; } #who { width:9em; }
-#topic { flex:1 1 100%; min-width:0; display:none; } #payload { flex:1; min-width:0; display:none; }
-body.layer-mqtt #text { display:none; } body.layer-mqtt #topic, body.layer-mqtt #payload { display:block; }
-#wirebox { display:none; margin-top:8px; padding:8px 10px; border:1px solid var(--line); border-radius:4px; font-size:0.72rem; background:var(--bg); white-space:pre-wrap; word-break:break-all; }
-#wirebox.show { display:block; }
-#hint { display:none; margin-top:8px; padding:8px 10px; border-radius:4px; font-size:0.76rem;
-        background:var(--warnbg); color:var(--warn); border:1px solid var(--line); }
-#hint.show { display:block; }
-#hint code { font-weight:500; }
-#wire { margin-top:10px; font-size:0.74rem; color:var(--muted); }
-#wire summary { cursor:pointer; }
-#wirelog { max-height:220px; overflow:auto; background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:8px; font-size:0.68rem; margin:6px 0 0; white-space:pre-wrap; word-break:break-all; }
-#wirelog .t { color:var(--accent); }
-#wirelog .in { color:var(--bot); } #wirelog .out { color:var(--twin); }
+form.send { display:flex; gap:6px; flex-wrap:wrap; }
+form.send input { font-size:0.82rem; padding:7px 10px; }
+form.send .grow { flex:1; min-width:0; }
+#who { width:9em; }
+#hint { display:none; margin-top:8px; padding:8px 10px; border-radius:4px; font-size:0.74rem; background:var(--warnbg); color:var(--warn); border:1px solid var(--line); }
+#hint.show { display:block; } #hint code { font-weight:500; }
+#ifhead { font-size:0.76rem; margin:0 0 6px; line-height:1.5; }
+#ifhead code { color:var(--accent); } #ifhead .real { color:var(--twin); } #ifhead .st { color:var(--muted); font-size:0.7rem; }
+#specwrap { max-height:170px; overflow:auto; border:1px solid var(--line); border-radius:4px; margin:0 0 8px; }
+#spec { border-collapse:collapse; font-size:0.7rem; width:100%; }
+#spec td { padding:2px 8px; vertical-align:top; border-bottom:1px solid var(--line); }
+#spec tr:last-child td { border-bottom:none; }
+#spec td:first-child { color:var(--accent); white-space:nowrap; cursor:pointer; }
+#spec tr:hover td { background:var(--me); }
+#spec td.doc { color:var(--muted); }
+#aikowire, #mqttnote { margin-top:8px; padding:8px 10px; border:1px solid var(--line); border-radius:4px; font-size:0.7rem; background:var(--bg); white-space:pre-wrap; word-break:break-all; display:none; }
+#aikowire.show, #mqttnote.show { display:block; }
+#wirelog { max-height:200px; overflow:auto; background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:8px; font-size:0.66rem; margin:0 0 8px; white-space:pre-wrap; word-break:break-all; }
+#wirelog .t { color:var(--accent); } #wirelog .in { color:var(--bot); } #wirelog .out { color:var(--twin); }
+#wirehead { display:flex; align-items:center; gap:10px; font-size:0.7rem; color:var(--muted); margin:0 0 6px; flex-wrap:wrap; }
+#wirehead label { cursor:pointer; }
 a { color:var(--accent); }
-</style></head><body class="view-__VIEW__ layer-chat">
+</style></head><body class="view-__VIEW__">
 <header>
   <h1>__TITLE__<span class="tag">virtual robots, real interfaces</span></h1>
   <nav>
@@ -120,42 +123,72 @@ a { color:var(--accent); }
     <button id="lock" type="button" title="API token" aria-expanded="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> token</button>
   </nav>
 </header>
-<p id="intro">Create a virtual robot that speaks a <em>real</em> robot's interface (the iRobot's, the XGO dog's, the LoliBot's, or the June-2026 tutorial turtle's), drive it over the chat, over Aiko, or over HTTP, and test your code before you touch the real one. Real robots on the community broker appear here as <span style="color:var(--twin)">twins</span>. New here? Read the <a href="/guide">guide</a>.</p>
 <div id="tokenbar"><label for="token">API token</label><input id="token" type="text" spellcheck="false" placeholder="paste the token"><span id="tokennote">sent with every create, drive and chat; the same <code>Authorization: Bearer …</code> header works for curl and scripts</span></div>
-<div id="status"><span id="conn">connecting…</span><span id="connhelp" class="warn"></span></div>
+<div id="status"><span id="conn">connecting…</span><span id="connhelp" class="warn"></span><span>New here? Read the <a href="/guide">guide</a>.</span></div>
 <main id="grid">
 <section class="panel" id="worldpanel">
-  <h2>World <span id="world"></span><span id="zoom"><button type="button" id="zin" title="zoom in (or scroll on the map)">+</button><button type="button" id="zout" title="zoom out">&minus;</button><button type="button" id="zfit" title="show every robot">fit all</button></span><a href="/world">full map</a></h2>
+  <h2>World <span id="world"></span><a href="/world">full map</a></h2>
+  <div id="mapbar">
+    <span id="zoom"><button type="button" id="zin" title="zoom in (or scroll on the map)">+</button><button type="button" id="zout" title="zoom out">&minus;</button><button type="button" id="zfit" title="show every robot">fit all</button></span>
+    <label title="a twin is the replica of a real robot on the broker"><input type="checkbox" id="showtwins" checked> show real robots (twins)</label><span id="twincount"></span>
+  </div>
   <canvas id="c" width="600" height="600"></canvas>
+  <div class="hintline">scroll to zoom · drag the ground to pan · drag a robot to put it somewhere else · dashed ring: a twin of a real robot</div>
   <ul id="robots"></ul>
+  <div id="pose"></div>
   <form id="create" autocomplete="off">
     <input id="newname" value="@@" aria-label="new robot name" pattern="@*[A-Za-z0-9][A-Za-z0-9_-]{0,63}" spellcheck="false" required>
     <select id="newkind" aria-label="kind"></select>
+    <label for="newiface">speaks</label><select id="newiface" aria-label="interface"></select>
     <button type="submit">create robot</button>
-    <a href="#" id="advtoggle">advanced</a>
   </form>
-  <div id="advanced"><label for="newiface">interface it speaks</label><select id="newiface" aria-label="interface"></select><span id="ifacenote"></span></div>
   <div id="kindinfo"></div>
-  <div id="pose"></div>
-  <div id="iface"></div>
-  <div class="hintline" id="maphelp">scroll to zoom, drag the ground to pan, drag a robot to move it · <label><input type="checkbox" id="showtwins" checked> show real robots (twins)</label><span id="twincount"></span></div>
 </section>
-<section class="panel" id="chatpanel">
-  <h2>#<select id="channel" aria-label="channel"></select> <span id="chatstate"></span><a href="/chat">full chat</a></h2>
-  <ol id="messages"><li id="empty">no messages yet</li></ol>
-  <div id="chips"></div>
-  <div id="layers">send as <button type="button" data-layer="chat" class="on" title="a chat message: the robot's ChatBot picks it up from the channel">chat</button><button type="button" data-layer="aiko" title="a remote function call on the robot's Actor, what the chat does underneath">aiko</button><button type="button" data-layer="mqtt" title="the raw MQTT message, what Aiko does underneath">mqtt</button></div>
-  <div id="layerhelp"></div>
-  <form id="send" autocomplete="off">
-    <input id="who" aria-label="your name" title="your name (anything you like; humans are @name)">
-    <input id="text" placeholder="@@robot move 100 — or ask __AGENT__" aria-label="message">
-    <input id="topic" placeholder="aiko/HOST/PID/SID/in" aria-label="MQTT topic" spellcheck="false">
-    <input id="payload" placeholder="(move 100)" aria-label="MQTT payload" spellcheck="false">
-    <button type="submit" id="sendbtn">send</button>
-  </form>
-  <div id="wirebox"></div>
-  <div id="hint"></div>
-  <details id="wire"><summary>on the wire: the selected robot's MQTT topics, live</summary><pre id="wirelog">(select a robot)</pre></details>
+<section class="panel" id="stack">
+  <div class="layer" id="layer-chat">
+    <div class="name">chat<small>people and agents talk here</small></div>
+    <div class="body">
+      <div id="chathead">#<select id="channel" aria-label="channel"></select> <span id="chatstate"></span><a href="/chat">full chat</a></div>
+      <ol id="messages"><li id="empty">no messages yet</li></ol>
+      <div id="chips"></div>
+      <form class="send" id="sendchat" autocomplete="off">
+        <input id="who" aria-label="your name" title="your name (anything you like; humans are @name)">
+        <input id="text" class="grow" placeholder="@@robot forward 100 — or ask __AGENT__" aria-label="message">
+        <button type="submit">send</button>
+      </form>
+      <p class="how" style="margin:8px 0 0">A message that starts with <code>@@name</code> is read by that robot's ChatBot from the channel, parsed with its interface's words, and becomes the Aiko call below. Anything else is conversation; <code>__AGENT__</code> turns plain words into calls.</p>
+      <div id="hint"></div>
+    </div>
+  </div>
+  <div class="arrow">&darr; the robot's ChatBot turns the words into a remote function call &darr;</div>
+  <div class="layer" id="layer-aiko">
+    <div class="name">aiko<small>a function call on the robot's Actor</small></div>
+    <div class="body">
+      <div id="ifhead">select a robot to see what it speaks</div>
+      <div id="specwrap"><table id="spec"><tbody></tbody></table></div>
+      <form class="send" id="sendaiko" autocomplete="off">
+        <input id="call" class="grow" placeholder="forward 100   (a function and its arguments; click one above)" aria-label="function call" spellcheck="false">
+        <button type="submit">call</button>
+      </form>
+      <p class="how" style="margin:8px 0 0">The call goes to the Actor as an S-expression on its <code>in</code> topic, the same message your own Python makes through a ServiceFilter. For a twin it goes straight to the real robot.</p>
+      <div id="aikowire"></div>
+    </div>
+  </div>
+  <div class="arrow">&darr; Aiko publishes the S-expression to the Actor's topic &darr;</div>
+  <div class="layer" id="layer-mqtt">
+    <div class="name">mqtt<small>the bytes on the broker</small></div>
+    <div class="body">
+      <div id="wirehead"><span id="wirewhat">on the wire: select a robot</span><label><input type="checkbox" id="wireon" checked> live</label></div>
+      <pre id="wirelog">(select a robot)</pre>
+      <form class="send" id="sendmqtt" autocomplete="off">
+        <input id="topic" class="grow" placeholder="aiko/HOST/PID/SID/in" aria-label="MQTT topic" spellcheck="false">
+        <input id="payload" class="grow" placeholder="(forward 100)" aria-label="MQTT payload" spellcheck="false">
+        <button type="submit">publish</button>
+      </form>
+      <p class="how" style="margin:8px 0 0">Any Service on the broker can be called this way, from any language, with nothing but an MQTT client (<a href="/system">/system</a> lists them). The log shows the selected robot's topics, the chat channel's, and for a twin the real robot's.</p>
+      <div id="mqttnote"></div>
+    </div>
+  </div>
 </section>
 </main>
 <script>
@@ -204,8 +237,9 @@ function api(path, method, body) {
 function explain(res) { return res.body && res.body.detail ? (typeof res.body.detail === "string" ? res.body.detail : JSON.stringify(res.body.detail)) : "HTTP " + res.status; }
 
 // ---- kinds, interfaces and sprites -------------------------------------------
-// A kind is a body (a sprite, how many axes it moves in); an interface is what
-// the robot speaks.  Each kind lists the interfaces it may speak, its own first.
+// A kind is a body (a sprite, how many axes it moves in); an interface is
+// what the robot speaks, "name:version (status)".  Each kind lists the
+// interfaces it may speak, the real robot's first, then legacy, then proposed.
 var KINDS = {}, IFACES = {}, SPRITES = {}, kindSelect = document.getElementById("newkind"), ifaceSelect = document.getElementById("newiface");
 fetch("/api/interfaces").then(function (r) { return r.json(); }).then(function (list) { list.forEach(function (i) { IFACES[i.name] = i; }); describeKind(); });
 fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list) {
@@ -217,32 +251,30 @@ fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list)
   kindSelect.value = load("turtle.kind", "turtle"); if (!KINDS[kindSelect.value]) kindSelect.value = list[0].name;
   describeKind();
 });
-function statusWord(i) { return i ? (i.status === "real" ? "real robot" : i.status === "legacy" ? "legacy" : "proposed") : ""; }
+function statusWord(i) { return i ? (i.status === "real" ? "real robot" : i.status) : ""; }
+function ifaceLabel(name) {        // "turtle_robot:0 (legacy)"
+  var i = IFACES[name]; if (!i) return name;
+  return name + ":" + (i.version !== null && i.version !== undefined ? i.version : "?") + " (" + statusWord(i) + ")";
+}
 function describeKind() {
   var k = KINDS[kindSelect.value]; if (!k) return;
   store("turtle.kind", kindSelect.value);
   var was = ifaceSelect.value; ifaceSelect.innerHTML = "";
   k.interfaces.forEach(function (name) {
-    var o = document.createElement("option"); o.value = name; var i = IFACES[name];
-    o.textContent = name + (i ? " (" + statusWord(i) + ")" : ""); ifaceSelect.append(o);
+    var o = document.createElement("option"); o.value = name; o.textContent = ifaceLabel(name); ifaceSelect.append(o);
   });
   ifaceSelect.value = k.interfaces.indexOf(was) >= 0 ? was : k.interfaces[0];
   describeInterface();
 }
 function describeInterface() {
-  var k = KINDS[kindSelect.value], i = IFACES[ifaceSelect.value]; if (!k) return;
-  document.getElementById("kindinfo").innerHTML = "";
-  var t = document.getElementById("kindinfo");
-  t.append(k.description + " — speaks ");
-  var c = document.createElement("code"); c.textContent = ifaceSelect.value; t.append(c);
-  if (i) t.append(" (" + statusWord(i) + "): " + i.description);
-  document.getElementById("ifacenote").textContent = i ? "e.g. " + i.commands.slice(0, 4).map(function (c) { return c.example; }).join(", ") : "";
+  var k = KINDS[kindSelect.value], i = IFACES[ifaceSelect.value], t = document.getElementById("kindinfo"); if (!k) return;
+  t.innerHTML = "";
+  t.append(k.description + ". ");
+  var c = document.createElement("code"); c.textContent = ifaceLabel(ifaceSelect.value); t.append(c);
+  if (i) t.append(": " + i.description + (i.source ? " (" + i.source + ")" : ""));
 }
 kindSelect.addEventListener("change", describeKind);
 ifaceSelect.addEventListener("change", describeInterface);
-document.getElementById("advtoggle").addEventListener("click", function (e) {
-  e.preventDefault(); var a = document.getElementById("advanced"); a.className = a.className ? "" : "show";
-});
 
 // ---- the world --------------------------------------------------------------
 var canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
@@ -367,7 +399,7 @@ function draw() {
   });
   var sel = robots[selected];
   document.getElementById("pose").textContent = sel ?
-    selected + " (" + (sel.type || "?") + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) + ((sel.z || 0) > 0 ? "  z=" + sel.z.toFixed(1) : "") + (sel.moving ? "  moving" : "") + (sel.pen === false ? "  pen up" : "") : "";
+    "@@" + selected + " (" + (sel.type || "?") + ", " + ifaceLabel(sel.interface) + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) + ((sel.z || 0) > 0 ? "  z=" + sel.z.toFixed(1) : "") + (sel.moving ? "  moving" : "") + (sel.pen === false ? "  pen up" : "") + (isTwin(sel) ? "  (a twin: an estimate, not a measurement)" : "") : "";
 }
 
 // ---- drag a robot to teleport it (any kind) ---------------------------------
@@ -450,7 +482,7 @@ function renderRobots() {
     li.className = (name === selected ? "selected" : "") + (isTwin(r) && !r.online ? " offline" : "");
     var d = document.createElement("span"); d.className = "dot"; d.style.background = colorOf(name);
     var label = document.createElement("span"); label.textContent = name;
-    var kind = document.createElement("span"); kind.className = "kind"; kind.textContent = r.type || "";
+    var kind = document.createElement("span"); kind.className = "kind"; kind.textContent = (r.type || "") + (r.interface ? " · " + r.interface : "");
     li.append(d, label, kind);
     if (isTwin(r)) { var b = document.createElement("span"); b.className = "badge twin" + (r.online ? "" : " off"); b.textContent = r.online ? "twin" : "twin, offline"; b.title = "the replica of a real robot" + (r.online ? "" : " that is not on the broker right now"); li.append(b); }
     else if (r.host === "external") { var b2 = document.createElement("span"); b2.className = "badge"; b2.textContent = "own process"; b2.title = "someone runs this robot in their own process (robot.py run)"; li.append(b2); }
@@ -465,7 +497,7 @@ function renderRobots() {
     li.addEventListener("click", function () { select(name); });
     list.append(li);
   });
-  document.getElementById("twincount").textContent = hidden ? " (" + hidden + " hidden)" : "";
+  document.getElementById("twincount").textContent = hidden ? "(" + hidden + " hidden)" : "";
   renderChips();
 }
 function select(name) { var changed = name !== selected; selected = name; renderRobots(); draw(); if (changed) { describeSelected(); watchWire(); } }
@@ -494,35 +526,52 @@ document.getElementById("create").addEventListener("submit", function (e) {
   });
 });
 
-// ---- the selected robot's interface: what it speaks, where it is on the bus ---
+// ---- the aiko layer: what the selected robot speaks ----------------------------
 var INFO = {};      // robot name -> /api/robots/NAME/interface
+var callBox = document.getElementById("call"), aikowire = document.getElementById("aikowire");
 function describeSelected() {
-  var box = document.getElementById("iface"); box.innerHTML = "";
+  var head = document.getElementById("ifhead"), tbody = document.querySelector("#spec tbody");
+  head.textContent = selected ? "loading @@" + selected + "…" : "select a robot to see what it speaks";
+  tbody.innerHTML = ""; aikowire.className = "";
   if (!selected) { renderChips(); return; }
   api("/api/robots/" + selected + "/interface").then(function (res) {
     if (!res.ok || selected !== res.body.name) return;
     var info = res.body, spec = info.spec || {}; INFO[selected] = info;
-    box.innerHTML = "";
-    var head = document.createElement("div");
-    head.append("speaks "); var c = document.createElement("code"); c.textContent = info.interface; head.append(c);
-    var st = document.createElement("span"); st.className = spec.status === "real" ? "real" : ""; st.textContent = " (" + statusWord(spec) + (spec.units ? "; " + spec.units : "") + ")"; head.append(st);
-    head.append(" · " + (info.host === "twin" ? "twin of a real robot" : info.host === "web" ? "virtual, hosted by the web server" : "virtual, in its owner's own process"));
-    box.append(head);
-    var tp = document.createElement("div"); tp.append("Actor topic path: "); var t = document.createElement("code"); t.textContent = info.topic_path || "(no live process)"; tp.append(t);
-    if (info.real_topic_path) { tp.append(" · the real robot: "); var t2 = document.createElement("code"); t2.textContent = info.real_topic_path; tp.append(t2); }
-    box.append(tp);
-    var det = document.createElement("details"), sum = document.createElement("summary");
-    sum.textContent = "interface spec: " + (spec.methods || []).length + " functions on its in topic" + (spec.source ? " (from " + spec.source + ")" : ""); det.append(sum);
-    var tbl = document.createElement("table");
-    (spec.methods || []).forEach(function (m) { var tr = document.createElement("tr"); var a = document.createElement("td"); a.textContent = m.name + m.signature; var b = document.createElement("td"); b.textContent = m.doc; tr.append(a, b); tbl.append(tr); });
-    det.append(tbl);
-    if (spec.description) { var p = document.createElement("div"); p.textContent = spec.description; det.append(p); }
-    box.append(det);
-    renderChips(); updateLayerHelp();
+    head.innerHTML = "";
+    head.append("@@" + selected + " speaks "); var c = document.createElement("code"); c.textContent = ifaceLabel(info.interface); head.append(c);
+    var st = document.createElement("span"); st.className = "st"; st.textContent = " " + (spec.protocol ? "protocol " + spec.protocol : "no protocol id, matched by name") + (spec.units ? " · " + spec.units : ""); head.append(st);
+    head.append(document.createElement("br"));
+    head.append((info.host === "twin" ? "a twin of the real robot at " : "a virtual robot, its Actor at "));
+    var t = document.createElement("code"); t.textContent = (info.host === "twin" ? info.real_topic_path : info.topic_path) || "(no live process)"; head.append(t);
+    if (info.host === "twin") { head.append(" (the twin's own Actor: "); var t2 = document.createElement("code"); t2.textContent = info.topic_path || "?"; head.append(t2, ")"); }
+    var examples = {};
+    (spec.commands || []).forEach(function (cmd) { var m = cmd.example.split(/\s+/)[0]; if (!examples[m]) examples[m] = cmd.example; });
+    (spec.methods || []).forEach(function (m) {
+      var tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td");
+      a.textContent = m.name + m.signature; a.title = "click to put " + (examples[m.name] || m.name) + " in the call box";
+      b.className = "doc"; b.textContent = m.doc; tr.append(a, b); tbody.append(tr);
+      a.addEventListener("click", function () { callBox.value = examples[m.name] || m.name; callBox.focus(); });
+    });
+    callBox.placeholder = (spec.commands && spec.commands[0] ? spec.commands[0].example : "help") + "   (a function and its arguments; click one above)";
+    renderChips(); watchWire();
   });
 }
+document.getElementById("sendaiko").addEventListener("submit", function (e) {
+  e.preventDefault();
+  var cmd = callBox.value.trim(); if (!cmd) return;
+  if (!selected) { aikowire.textContent = "select a robot first"; aikowire.className = "show"; return; }
+  api("/api/robots/" + selected + "/wire?command=" + encodeURIComponent(cmd)).then(function (res) {
+    if (!res.ok) { aikowire.textContent = "cannot call: " + explain(res); aikowire.className = "show"; return; }
+    var w = res.body;
+    aikowire.textContent = "# Python, over Aiko:\n" + w.python + "\n\n# which publishes " + w.payload + " to " + (w.topic || "(no live process)");
+    aikowire.className = "show";
+    document.getElementById("topic").value = w.topic || ""; document.getElementById("payload").value = w.payload;
+    if (w.topic) publish(w.topic, w.payload, true);
+    callBox.value = "";
+  });
+});
 
-// ---- chat -------------------------------------------------------------------
+// ---- the chat layer -----------------------------------------------------------
 var messages = document.getElementById("messages"), channelSelect = document.getElementById("channel");
 var channel = load("turtle.channel", DEFAULT_CHANNEL), history = {};
 function renderChannels(info) {
@@ -598,91 +647,60 @@ function send(text) {
     if (!res.ok) document.getElementById("chatstate").textContent = "send failed: " + explain(res);
   });
 }
-
-// ---- the layers: chat -> aiko -> mqtt ------------------------------------------
-// The same command, three ways down the stack.  "chat" is a message in the
-// channel that the robot's ChatBot picks up; "aiko" is the remote function
-// call the ChatBot makes, an S-expression on the Actor's "in" topic; "mqtt"
-// is that very MQTT message, typed by hand.  The wire log below shows them
-// arrive.
-var layer = "chat", wirebox = document.getElementById("wirebox"), textBox = document.getElementById("text");
-var topicBox = document.getElementById("topic"), payloadBox = document.getElementById("payload");
-document.querySelectorAll("#layers button").forEach(function (b) {
-  b.addEventListener("click", function () { setLayer(b.getAttribute("data-layer")); });
-});
-function setLayer(name) {
-  layer = name; document.body.className = document.body.className.replace(/layer-\w+/, "layer-" + name);
-  document.querySelectorAll("#layers button").forEach(function (b) { b.className = b.getAttribute("data-layer") === name ? "on" : ""; });
-  wirebox.className = ""; updateLayerHelp();
-  if (name === "mqtt") { var info = INFO[selected]; if (info && !topicBox.value) topicBox.value = (info.real_topic_path || info.topic_path || "") + "/in"; }
-}
-function updateLayerHelp() {
-  var h = document.getElementById("layerhelp"), info = INFO[selected], name = selected || "ROBOT";
-  if (layer === "chat") { h.textContent = "a chat message in #" + channel + ": the robot's ChatBot reads the channel and acts on messages that start with @@" + name + ". Buttons above fill one in."; textBox.placeholder = "@@" + name + " " + (info && info.spec.commands[0] ? info.spec.commands[0].example : "help") + " — or ask " + AGENT; }
-  else if (layer === "aiko") { h.textContent = "a remote function call on @@" + name + "'s Actor: type the command without the mention (e.g. " + (info && info.spec.commands[0] ? info.spec.commands[0].example : "help") + "); the page shows the S-expression it becomes and publishes it to the Actor's in topic" + (info && info.host === "twin" ? " (a twin: straight to the REAL robot)" : "") + "."; textBox.placeholder = info && info.spec.commands[0] ? info.spec.commands[0].example : "move 100"; }
-  else { h.textContent = "the raw MQTT message: a topic and an S-expression payload, exactly what Aiko sends. Any Service on the broker can be called this way (see /system)."; }
-}
-document.getElementById("send").addEventListener("submit", function (e) {
-  e.preventDefault();
-  if (layer === "chat") { send(textBox.value); textBox.value = ""; return; }
-  if (layer === "mqtt") { publish(topicBox.value.trim(), payloadBox.value.trim()); return; }
-  var cmd = textBox.value.trim(); if (!cmd) return;
-  if (!selected) { wirebox.textContent = "select a robot first"; wirebox.className = "show"; return; }
-  api("/api/robots/" + selected + "/wire?command=" + encodeURIComponent(cmd)).then(function (res) {
-    if (!res.ok) { wirebox.textContent = "cannot send: " + explain(res); wirebox.className = "show"; return; }
-    var w = res.body;
-    wirebox.textContent = "# Python, over Aiko (what the chat does underneath):\n" + w.python + "\n\n# which publishes, on the Actor's in topic:\n" + (w.topic || "(no live process)") + "\n" + w.payload;
-    wirebox.className = "show";
-    topicBox.value = w.topic || ""; payloadBox.value = w.payload;
-    if (w.topic) publish(w.topic, w.payload);
-    textBox.value = "";
-  });
-});
-function publish(topic, payload) {
-  if (!topic || !payload) { wirebox.textContent = "topic and payload needed"; wirebox.className = "show"; return; }
-  api("/api/mqtt", "POST", { topic: topic, payload: payload }).then(function (res) {
-    if (!res.ok) { wirebox.textContent = "publish failed: " + explain(res); wirebox.className = "show"; return; }
-    if (layer === "mqtt") { wirebox.textContent = "published to " + topic + ": " + payload + "\n(watch the wire log below for the reply; the robot answers in the chat too)"; wirebox.className = "show"; }
-  });
-}
+var textBox = document.getElementById("text");
+document.getElementById("sendchat").addEventListener("submit", function (e) { e.preventDefault(); send(textBox.value); textBox.value = ""; });
 var chips = document.getElementById("chips");
 function renderChips() {
   chips.innerHTML = "";
   var sel = robots[selected], info = INFO[selected], kind = sel && KINDS[sel.type];
-  var examples = info ? info.spec.commands.map(function (c) { return [c.example, c.help]; }) : (kind ? kind.commands.map(function (c) { return [c, ""]; }) : [["help", "what can it do"]]);
-  examples.slice(0, 12).concat([["help", "what this robot takes"]]).forEach(function (cmd) {
+  var examples = info ? info.spec.commands.map(function (c) { return [c.example, c.help]; }) : (kind ? kind.commands.map(function (c) { return [c, ""]; }) : []);
+  examples.slice(0, 10).concat([["help", "what this robot takes"]]).forEach(function (cmd) {
     var b = document.createElement("button"); b.type = "button"; b.textContent = cmd[0];
     b.title = (cmd[1] ? cmd[1] + " — " : "") + "send @@" + (selected || "robot") + " " + cmd[0];
     b.addEventListener("click", function () {
       if (!selected) { document.getElementById("pose").textContent = "select or create a robot first"; return; }
-      if (layer === "chat") send("@@" + selected + " " + cmd[0]); else { setLayer("aiko"); textBox.value = cmd[0]; document.getElementById("sendbtn").click(); }
+      send("@@" + selected + " " + cmd[0]);
     });
     chips.append(b);
   });
   var ask = document.createElement("button"); ask.type = "button"; ask.textContent = AGENT + " move " + (selected || "a robot") + " in a star";
   ask.addEventListener("click", function () { send(AGENT + " move " + (selected || "a robot") + " in a star shape"); });
   chips.append(ask);
+  textBox.placeholder = "@@" + (selected || "robot") + " " + (info && info.spec.commands[0] ? info.spec.commands[0].example : "help") + " — or ask " + AGENT;
 }
-renderChips(); updateLayerHelp();
+renderChips();
 
-// ---- the wire log: the selected robot's topics, live, over one SSE stream ------
-var wire = document.getElementById("wire"), wirelog = document.getElementById("wirelog"), wireSource = null, wireLines = 0;
-wire.open = load("turtle.wire", "closed") === "open";
-wire.addEventListener("toggle", function () { store("turtle.wire", wire.open ? "open" : "closed"); watchWire(); });
+// ---- the mqtt layer: publish, and the live log of the selected robot's topics --
+var mqttnote = document.getElementById("mqttnote");
+function publish(topic, payload, fromAiko) {
+  if (!topic || !payload) { mqttnote.textContent = "topic and payload needed"; mqttnote.className = "show"; return; }
+  api("/api/mqtt", "POST", { topic: topic, payload: payload }).then(function (res) {
+    if (!res.ok) { mqttnote.textContent = "publish failed: " + explain(res); mqttnote.className = "show"; return; }
+    if (!fromAiko) { mqttnote.textContent = "published " + payload + " to " + topic + "  (the reply shows in the log above and, for a robot, in the chat)"; mqttnote.className = "show"; }
+  });
+}
+document.getElementById("sendmqtt").addEventListener("submit", function (e) {
+  e.preventDefault(); publish(document.getElementById("topic").value.trim(), document.getElementById("payload").value.trim());
+});
+var wirelog = document.getElementById("wirelog"), wireOn = document.getElementById("wireon"), wireSource = null, wireLines = 0;
+wireOn.checked = load("turtle.wire", "on") !== "off";
+wireOn.addEventListener("change", function () { store("turtle.wire", wireOn.checked ? "on" : "off"); watchWire(); });
 function watchWire() {
   if (wireSource) { wireSource.close(); wireSource = null; }
-  if (!wire.open) return;
-  var info = INFO[selected];
-  if (!selected) { wirelog.textContent = "(select a robot)"; return; }
+  var what = document.getElementById("wirewhat"), info = INFO[selected];
+  if (!selected) { wirelog.textContent = "(select a robot)"; what.textContent = "on the wire: select a robot"; return; }
   if (!info) { setTimeout(watchWire, 500); return; }        // the interface call is on its way
   var topics = [];
   if (info.topic_path) topics.push(info.topic_path + "/#");
   if (info.real_topic_path) topics.push(info.real_topic_path + "/#");
   if (CHAT_TOPIC) topics.push(CHAT_TOPIC + "/" + channel);
+  what.textContent = "on the wire: " + topics.join("  ");
   if (!topics.length) { wirelog.textContent = "(no live process for " + selected + ")"; return; }
+  if (!wireOn.checked) { wirelog.textContent = "(paused)"; return; }
   var t = token.value.trim();
   if (AUTH && !t) { wirelog.textContent = "token needed: see the lock at the top"; return; }
-  wirelog.textContent = "watching " + topics.join("  ") + "\n"; wireLines = 1;
+  if (!document.getElementById("topic").value) document.getElementById("topic").value = (info.real_topic_path || info.topic_path || "") + "/in";
+  wirelog.textContent = ""; wireLines = 0;
   wireSource = new EventSource("/api/mqtt/events?topic=" + encodeURIComponent(topics.join(",")) + (t ? "&token=" + encodeURIComponent(t) : ""));
   wireSource.onmessage = function (ev) {
     var m = JSON.parse(ev.data), leaf = m.topic.split("/").pop(), line = document.createElement("div");

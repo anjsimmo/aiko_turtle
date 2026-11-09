@@ -8,7 +8,7 @@ from world_model import World, WorldError, parse_pose_text, pose_text
 def test_create_move_turn_reset():
     world = World("sqlite://")
     assert world.create("t1") == {"name": "t1", "kind": "turtle",
-        "interface": "proposed", "source": "", "pen": 1, "moving": False,
+        "interface": "turtle_robot", "source": "", "pen": 1, "moving": False,
         "owner": "anonymous", "host": "external",
         "x": 0.0, "y": 0.0, "heading": 0.0, "z": 0.0}
     assert world.turn("t1", "90")["heading"] == 90.0
@@ -44,7 +44,7 @@ def test_history_and_destroy():
     world.turn("t1", 2, username="bob")
     history = world.history("t1")
     assert [(h["username"], h["command"], h["argument"]) for h in history] \
-        == [("anonymous", "create", "turtle,proposed"), ("alice", "move", "1"),
+        == [("anonymous", "create", "turtle,turtle_robot"), ("alice", "move", "1"),
             ("bob", "turn", "2")]
     world.destroy("t1")
     assert world.list() == []

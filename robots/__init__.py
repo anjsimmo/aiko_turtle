@@ -76,6 +76,10 @@ def _load():
         for kind in getattr(module, "FITS", []):
             if kind in KINDS and module.NAME not in KINDS[kind]["interfaces"]:
                 KINDS[kind]["interfaces"].append(module.NAME)
+    for kind, entry in KINDS.items():   # the default: real, else legacy, else proposed
+        entry["interfaces"].sort(key=lambda name: (
+            _PRIORITY[INTERFACES[name].STATUS],
+            0 if kind in getattr(INTERFACES[name], "KINDS", {}) else 1, name))
     ordered = [kind for kind in _KIND_ORDER if kind in KINDS]
     ordered += [kind for kind in KINDS if kind not in ordered]
     for kind in ordered:                # the page's order: the familiar ones first
@@ -111,6 +115,8 @@ def kind_axes(kind):
 
 def supports(interface, kind, method):
     module = INTERFACES[interface]
+    if method not in {spec["name"] for spec in base.method_specs(module.Interface)}:
+        return False                    # not a function of this interface at all
     check = getattr(module, "supports", None)
     return check(kind, method) if check else True
 
@@ -145,6 +151,7 @@ def describe_interface(name, kind=None):
              if kind is None or supports(name, kind, spec["name"])]
     return {"name": name, "label": module.LABEL, "description": module.DESCRIPTION,
             "status": module.STATUS, "protocol": module.PROTOCOL,
+            "version": protocol_version(module.PROTOCOL),
             "units": module.UNITS, "source": getattr(module, "SOURCE", ""),
             "real": getattr(module, "MATCH", None) is not None,
             "match": getattr(module, "MATCH", None),
@@ -154,6 +161,12 @@ def describe_interface(name, kind=None):
                          for example, help_text in commands(name, kind)],
             "kinds": [kind_name for kind_name, entry in KINDS.items()
                       if name in entry["interfaces"]]}
+
+
+def protocol_version(protocol):
+    """The ":N" at the end of an Aiko protocol id, or None if there is none"""
+    _, _, version = (protocol or "").rpartition(":")
+    return version if version.isdigit() else None
 
 
 def describe_interfaces():

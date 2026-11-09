@@ -62,10 +62,15 @@ def _tags(service_details):
     return tags
 
 
-def real_robot_interface(service_details):
+def real_robot_interface(service_details, world_name=None):
     """The interface a Registrar entry speaks, if a robots/ module
-    recognises it as a real robot (by name or protocol): else None"""
+    recognises it as a real robot (by name or protocol): else None.
+    A Service tagged world=NAME is a stand-in for one sandbox only
+    (tools/fake_robot.py): real robots carry no world tag"""
     topic_path, name, protocol = service_details[:3]
+    world = _tags(service_details).get("world")
+    if world_name is not None and world and world != world_name:
+        return None
     for interface, module in registry.INTERFACES.items():
         match = getattr(module, "MATCH", None)
         if not match:
@@ -142,7 +147,7 @@ class AikoBackend(aiko.Actor):
             return
         if SANDBOX_TAG in tags:
             return                      # another sandbox's twin or web server
-        interface = real_robot_interface(service_details)
+        interface = real_robot_interface(service_details, self.world_name)
         if interface:
             print(f"WEB: real robot {name} at {topic_path} speaks {interface}",
                   flush=True)
@@ -390,7 +395,7 @@ class AikoBackend(aiko.Actor):
                 "topic_path": topic_path, "name": name, "protocol": protocol,
                 "transport": transport, "owner": owner,
                 "tags": [str(tag) for tag in (tags or [])],
-                "real_robot": real_robot_interface(details)})
+                "real_robot": real_robot_interface(details, self.world_name)})
         services.sort(key=lambda service: service["topic_path"])
         return {
             "mqtt": {"host": config.AIKO_MQTT_HOST, "port": config.AIKO_MQTT_PORT,

@@ -147,7 +147,7 @@ def test_chat_and_docs(client):
     assert client.get("/api/chat").json()[0]["username"] == "zoe"
     assert client.get("/docs").status_code == 200
     for path in ("/", "/world", "/chat", "/guide", "/system"):
-        assert "Aiko Sandbox" in client.get(path).text, path
+        assert "aiko_turtle" in client.get(path).text, path
         assert "__TITLE__" not in client.get(path).text, path
     assert "Testbed" in TestClient(create_app(client.backend, api_token="",
                                               title="Testbed")).get("/").text

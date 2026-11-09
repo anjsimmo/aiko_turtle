@@ -1,4 +1,4 @@
-# aiko_turtle: the Aiko Sandbox
+# aiko_turtle
 
 Virtual robots in a shared world, for the AI+ML+Robots community to learn
 and play with [Aiko Services](https://github.com/geekscape/aiko_services),
@@ -9,9 +9,7 @@ from a REST API, from an LLM agent or from their own Aiko code, and watch
 every robot move in the browser. Real robots on the community broker
 appear as twins. A live instance is at **https://turtle.aiko.hashtag.ai**
 (the in-page [guide](https://turtle.aiko.hashtag.ai/guide) is the
-friendliest start). The page calls itself "Aiko Sandbox" (`TURTLE_TITLE`
-sets the name); the repository and the hostname keep the turtle name for
-now, see `docs/deployment.md` for the rename.
+friendliest start). `TURTLE_TITLE` renames the pages.
 
 ![The home page: the world map on the left, the #robots chat on the right](docs/screenshot.png)
 
@@ -220,7 +218,7 @@ versions of these tables.
 
 | kind | what it is | interfaces it may speak |
 |---|---|---|
-| `turtle` | the classic drawing turtle | proposed, turtle_robot |
+| `turtle` | the classic drawing turtle | turtle_robot (the tutorial's, the default), proposed |
 | `lolibot` | the OHC [LoliBot](https://openhardwareconf.org/wiki/LoliBot), and Jon Oxer's BeetleBot | lolibot, proposed |
 | `xgo` | XGO robot dog (walks forward and sideways) | xgo_robot, proposed |
 | `irobot` | iRobot Create 3 with a Pi on top | irobot, proposed |
@@ -242,6 +240,16 @@ as a chat message, as the Aiko remote function call the chat makes
 same through a ServiceFilter), or as the raw MQTT message; the *on the
 wire* log shows the selected robot's topics live. `GET
 /api/robots/NAME/wire?command=...` is the translation.
+
+**Trying it without a real robot.** `tools/fake_robot.py INTERFACE` runs a
+stand-in that registers exactly as the real robot's software does (same
+protocol, name and functions), and lets you choose what it reports:
+`--telemetry none` (an XGO: nothing), `--telemetry pose` (the iRobot's
+`(pose x y heading)` stream), `--telemetry odd` (a format the sandbox
+does not know), `--drift 80` (wheels that slip, so dead reckoning and the
+reported pose disagree), `--no-echo`. It is tagged with your world name so
+only your sandbox twins it; `--like-real` drops the tag and every sandbox
+on the broker, the production one included, twins it.
 
 **Twins.** When a Service a module recognises appears in the Registrar,
 the web server creates a twin named after it (`name_host` on a clash),
@@ -324,7 +332,8 @@ the proxy needs `proxy_buffering off` for the SSE endpoint.
 | `webapp.py` | the FastAPI app and routes (no Aiko; testable) |
 | `static/` | the pages: `index.html` (also `/world`, `/chat`), `guide.html`, `system.html`; `sprites/` one drawing per kind |
 | `mcp_server.py` | MCP server over the REST API |
-| `examples/` | `rest_drive.py`, `aiko_drive.py`, `agent_bot.py`, `colab_turtle.ipynb` |
+| `examples/` | `rest_drive.py`, `aiko_drive.py`, `agent_bot.py`, `colab_turtle.ipynb`; `notebooks/`: the June-2026 tutorial notebooks with notes for running them against the sandbox in Colab |
+| `tools/fake_robot.py` | a stand-in for a real robot: registers as the real one does, with the telemetry behaviour you choose, so twins can be tested without the robot |
 | `web.py` | the Aiko-connected backend and server |
 | `tests/` | pytest |
 | `start.sh` `stop.sh` `env.sh` | local convenience |

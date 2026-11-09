@@ -59,18 +59,20 @@ a { color:var(--accent); }
 </ul>
 
 <h2 id="humans">1. Humans: the page and the chat</h2>
-<p>Open the <a href="/">home page</a>. The world is on the left, the chat on the right. Type a robot name, pick a kind, press <em>create robot</em>; <em>advanced</em> lets you choose which interface it speaks (a turtle speaks the sandbox's proposed interface or the June-2026 tutorial's <code>turtle_robot</code>; an XGO speaks the real dog's <code>xgo_robot</code>). Click a robot to select it; the buttons under the chat send it the commands its interface takes, and the box under the map shows that interface: every function, what it means, and the robot's topic path on the bus. Scroll on the map to zoom, drag the ground to pan, drag a robot to put it somewhere else; robots outside the view show as arrows on the edge, and <em>fit all</em> brings everyone back. Everything you do, everyone sees. <a href="/world">/world</a> is the map alone, <a href="/chat">/chat</a> the chat alone (good for a second screen or a phone).</p>
+<p>Open the <a href="/">home page</a>. The world is on the left, the chat on the right. Type a robot name, pick a kind, pick what it <em>speaks</em> (a turtle speaks the June-2026 tutorial's <code>turtle_robot:0</code> by default, or the sandbox's proposed interface; an XGO speaks the real dog's <code>xgo_robot:0</code>), press <em>create robot</em>. Click a robot to select it. The right-hand panel is the stack: the chat at the top with buttons for the commands its interface takes, the <em>aiko</em> layer under it with every function of that interface and the robot's topic path, and the <em>mqtt</em> layer at the bottom with the bytes on the broker, live. Scroll on the map to zoom, drag the ground to pan, drag a robot to put it somewhere else; robots outside the view show as arrows on the edge, and <em>fit all</em> brings everyone back. Everything you do, everyone sees. <a href="/world">/world</a> is the map alone, <a href="/chat">/chat</a> the chat alone (good for a second screen or a phone).</p>
 <p>Three conventions make the chat work for people and machines at once:</p>
 <ul>
   <li><span class="who">@name</span> Humans are <code>@name</code>. The page adds the <code>@</code> for you.</li>
   <li><span class="who bot">@@name</span> Bots, robots and agents are <code>@@name</code>. A robot acts only on a message that <em>starts</em> with its <code>@@name</code>; talking <em>about</em> a robot does nothing to it.</li>
   <li>Bot replies end with <code>!!!!</code> (you do not see it) so bots never answer bots.</li>
 </ul>
-<pre>@@my_turtle move 100        ;; forward 100 units (negative = backwards)   [proposed interface]
-@@my_turtle turn 90         ;; degrees counter-clockwise
-@@my_turtle look            ;; where am I
-@@my_turtle grasp           ;; kinds with an arm (LeKiwi, SO-101)
-@@my_turtle telemetry       ;; battery and temperature
+<pre>@@my_turtle forward 100     ;; a turtle: the June-2026 tutorial's words           [turtle_robot:0, legacy]
+@@my_turtle left 90         ;; degrees; also right, backward, penup, pendown, action forward
+@@my_arm move 100           ;; forward 100 units (negative = backwards)             [the proposed interface]
+@@my_arm turn 90            ;; degrees counter-clockwise
+@@my_arm look               ;; where am I
+@@my_arm grasp              ;; kinds with an arm (LeKiwi, SO-101)
+@@my_arm telemetry          ;; battery and temperature
 @@my_dog move x 100         ;; an XGO: walk forward, 100 mm steps, until "stop"   [xgo_robot, the real dog's words]
 @@my_dog action sit         ;; an XGO action from its table (stand, wiggle_tail, ...)
 @@my_create move 1          ;; an iRobot Create 3: one METRE forward                [irobot, the real robot's words]
@@ -84,10 +86,10 @@ __AGENT__ move my_turtle in a star shape     ;; the LLM agent, in plain words, w
 <p>The channel is <code>#__CHANNEL__</code> by default. The dropdown in the chat header lists the channels the ChatServer knows and lets you switch or create one (type a new name under <em>other</em>). Robots listen in <code>#__CHANNEL__</code>; tell one <code>@@name join lab</code> to move it. The same chat is open from a terminal with Aiko installed (next section): <code>aiko_chat repl</code>, then <code>:cc __CHANNEL__</code>.</p>
 
 <h2 id="layers">2. The three layers: chat, Aiko, MQTT</h2>
-<p>Everything on the page goes down the same stack, and the page lets you send at any level of it. Under the chat box, <em>send as</em> picks the layer; the <em>on the wire</em> log under it shows the selected robot's MQTT topics live, so you see each layer become the next.</p>
+<p>Everything on the page goes down the same stack, and the right-hand panel <em>is</em> that stack: three layers, each with its own way in, each inspectable. Send a chat message and watch it become a function call and then bytes on the broker in the layers below.</p>
 <table><thead><tr><th>layer</th><th>what you send</th><th>what happens</th></tr></thead><tbody>
-<tr><td><strong>chat</strong></td><td><code>@@my_dog move x 100</code> in <code>#__CHANNEL__</code></td><td>the ChatServer relays it on the channel's topic; the robot's ChatBot reads it, parses the words with its interface module, and calls the function on itself. People and LLM agents live here.</td></tr>
-<tr><td><strong>aiko</strong></td><td><code>move x 100</code>, the command without the mention</td><td>a remote function call on the robot's Actor: the page shows the S-expression <code>(move x 100)</code> and the Python that makes the same call through a ServiceFilter, and publishes it to the Actor's <code>in</code> topic. Your own Python does exactly this.</td></tr>
+<tr><td><strong>chat</strong></td><td><code>@@my_dog move x 100</code> in <code>#__CHANNEL__</code> (or a button)</td><td>the ChatServer relays it on the channel's topic; the robot's ChatBot reads it, parses the words with its interface module, and calls the function on itself. People and LLM agents live here.</td></tr>
+<tr><td><strong>aiko</strong></td><td><code>move x 100</code> in the <em>call</em> box (click a function in the spec table to fill it)</td><td>a remote function call on the robot's Actor: the page shows the S-expression <code>(move x 100)</code> and the Python that makes the same call through a ServiceFilter, and publishes it to the Actor's <code>in</code> topic. Your own Python does exactly this.</td></tr>
 <tr><td><strong>mqtt</strong></td><td>a topic and a payload, <code>aiko/HOST/PID/SID/in</code> and <code>(move x 100)</code></td><td>the raw MQTT message, which is all Aiko ever sends. Any Service on the broker can be called this way from any language; <a href="/system">/system</a> lists them.</td></tr>
 </tbody></table>
 <p>A twin of a real robot (section 7) forwards the aiko and mqtt layers straight to the real robot's own topic, so the log then shows the real robot's <code>in</code> and <code>out</code> as well.</p>
@@ -199,7 +201,7 @@ curl -X POST __BASE__/api/mqtt -H "Authorization: Bearer $TOKEN" -H 'Content-Typ
 <p>The interfaces come in three statuses, and the status is shown next to each:</p>
 <ul>
   <li><strong>real</strong>: a physical robot's interface <em>as it is today</em>, read from its code, not changed to match ours. <code>irobot</code> (the Create 3 under aiko_irobot on Zebra2, which registers as <code>robot</code>), <code>xgo_robot</code> (the XGO dog's Actor in aiko_chat). The virtual robot accepts exactly those functions, with those units, and refuses the ones that would switch a real robot off (power off, terminate) in the chat.</li>
-  <li><strong>legacy</strong>: an interface older code still speaks. <code>turtle_robot</code> is the June-2026 tutorial notebooks' turtle (<code>forward</code>, <code>left</code>, <code>right</code>, <code>backward</code>, <code>action</code>), so those notebooks drive a sandbox turtle unchanged.</li>
+  <li><strong>legacy</strong>: an interface older code still speaks. <code>turtle_robot:0</code> is the June-2026 tutorial notebooks' turtle (<code>forward</code>, <code>left</code>, <code>right</code>, <code>backward</code>, <code>action</code>), and the sandbox turtle's default, so those notebooks work unchanged: <a href="https://tinyurl.com/ai-ml-robots-2026-06-colab-a">part 1, the agent</a> drives a sandbox turtle by name, and <a href="https://tinyurl.com/ai-ml-robots-2026-06-colab-t">part 2, the robot</a> appears here as a twin. Copies with notes on running them against the sandbox are in <code>examples/notebooks/</code> (open them in Google Colab: File &gt; Upload notebook, then Runtime &gt; Run all).</li>
   <li><strong>proposed</strong>: what we would like robots to speak, the sandbox's <code>&lt;Move&gt;</code>/<code>&lt;Grasp&gt;</code>/<code>&lt;Perceive&gt;</code>/<code>&lt;Telemetry&gt;</code> Interfaces, and <code>lolibot</code>, the words the updated LoliBot firmware in <code>lolibot_mp/</code> takes (<code>forward</code>, <code>left</code>, <code>stop</code>, <code>led</code>, with an optional duration).</li>
 </ul>
 <table><thead><tr><th>interface</th><th>status</th><th>protocol</th><th>units</th><th>source</th></tr></thead><tbody id="ifaces"></tbody></table>

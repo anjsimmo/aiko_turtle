@@ -76,7 +76,9 @@ def test_module_contract(name):
 
 def test_kinds_and_resolution():
     assert list(robots.KINDS)[:4] == ["turtle", "lolibot", "xgo", "irobot"]
-    assert robots.resolve("turtle", None) == ("turtle", "proposed")
+    assert robots.resolve("turtle", None) == ("turtle", "turtle_robot")   # the tutorial's, by default
+    assert robots.resolve("lekiwi", None) == ("lekiwi", "proposed")
+    assert robots.protocol_version("a/b/xgo_robot:0") == "0" and robots.protocol_version("") is None
     assert robots.resolve("xgo", None) == ("xgo", "xgo_robot")        # the real one first
     assert robots.resolve("turtle", "turtle_robot") == ("turtle", "turtle_robot")
     with pytest.raises(ValueError):

@@ -284,28 +284,6 @@ DNS change at all: in the `hashtag.ai` zone (Route 53),
 with a different name. Without a wildcard, add an `A` or `CNAME` record
 for the name before running certbot, which validates over HTTP.
 
-## 5b. Renaming the site to sandbox.aiko.hashtag.ai
-
-The pages call themselves "Aiko Sandbox" (`TURTLE_TITLE` in `.env`
-changes the name), but the hostname is still `turtle.aiko.hashtag.ai`.
-The wildcard CNAME in step 5 already resolves `sandbox.aiko.hashtag.ai`
-to the host, so the rename is an nginx site and a certificate, with the
-old name kept as a redirect so existing links, notebooks and MCP configs
-keep working:
-
-```
-sudo cp /etc/nginx/sites-available/turtle.aiko.hashtag.ai /etc/nginx/sites-available/sandbox.aiko.hashtag.ai
-sudo sed -i 's/turtle\.aiko\.hashtag\.ai/sandbox.aiko.hashtag.ai/g; s#/turtle\.#/sandbox.#g' /etc/nginx/sites-available/sandbox.aiko.hashtag.ai
-sudo ln -s /etc/nginx/sites-available/sandbox.aiko.hashtag.ai /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d sandbox.aiko.hashtag.ai
-# then turn the old site into a redirect: replace its location blocks with
-#   return 301 https://sandbox.aiko.hashtag.ai$request_uri;
-```
-
-Nothing in the application depends on the hostname: `TURTLE_URL` in MCP
-configs and the base URL in `examples/` are the only places that name it.
-
 ## 6. Updating a running instance
 
 The server is a plain clone of the GitHub repository. Never edit or copy

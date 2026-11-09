@@ -30,7 +30,7 @@ WORLD_NAME = env("TURTLE_WORLD", "turtle_world")
 DATABASE_URL = env("TURTLE_DATABASE_URL", "sqlite:///turtle.db")
 
 # The page's name (the subdomain used to be turtle.; sandbox. is the plan)
-TITLE = env("TURTLE_TITLE", "Aiko Sandbox")
+TITLE = env("TURTLE_TITLE", "aiko_turtle")
 
 # Chat
 CHANNEL = env("TURTLE_CHANNEL", "robots")
