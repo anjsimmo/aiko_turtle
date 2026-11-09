@@ -1,15 +1,16 @@
 # <Robot>, the Aiko-native high-level robot interface: <Move> <Grasp>
 # <Perceive> <Telemetry> composed (interfaces.py), one aspect tag per
-# Interface ("move=0"), protocol "robot:0".  A robot that also chats is a
-# <Chat> + <Robot> composition and registers with "chat_robot:0"; that is
-# what every virtual robot here does.  Nothing physical speaks robot:0
-# yet, so its status is proposed; the real ones (irobot.py, xgo_robot.py,
+# Interface ("move=0"), protocol "robot:0".  Virtual and real robots
+# speaking it register with that same protocol, so one ServiceFilter
+# finds both; that a virtual one also chats is a tag (chat=0), not a
+# different protocol.  Nothing physical speaks robot:0 yet, so its
+# status is proposed; the real ones (irobot.py, xgo_robot.py,
 # turtle_robot.py) are described as they are today.
 
 import aiko_services as aiko
 
 from robots import base
-from interfaces import CHAT_ROBOT_PROTOCOL, ROBOT_PROTOCOL, Grasp, Move, Perceive, Telemetry
+from interfaces import ROBOT_PROTOCOL, Grasp, Move, Perceive, Telemetry
 
 NAME = "robot"
 LABEL = "Robot: Move / Grasp / Perceive / Telemetry (Aiko-native)"
@@ -18,8 +19,7 @@ DESCRIPTION = ("move takes a vector in the robot's own frame (forward [left "
                "snapshot, telemetry; one aspect tag per Interface. A proposal: "
                "no physical robot speaks it yet")
 STATUS = base.STATUS_PROPOSED
-PROTOCOL = ROBOT_PROTOCOL                    # robot:0, the robot half
-VIRTUAL_PROTOCOL = CHAT_ROBOT_PROTOCOL        # a virtual robot also chats: chat_robot:0
+PROTOCOL = ROBOT_PROTOCOL                    # robot:0, virtual and real alike
 UNITS = "world units (cm) and degrees"
 SOURCE = "interfaces.py"
 MATCH = {"protocol": PROTOCOL}               # a real robot speaking robot:0 gets a replica

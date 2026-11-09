@@ -68,7 +68,10 @@ def real_robot_interface(service_details, world_name=None):
     A Service tagged world=NAME is a stand-in for one sandbox only
     (tools/fake_robot.py): real robots carry no world tag"""
     topic_path, name, protocol = service_details[:3]
-    world = _tags(service_details).get("world")
+    tags = _tags(service_details)
+    if SANDBOX_TAG in tags:
+        return None                     # one of ours: a virtual robot, a replica, a web server
+    world = tags.get("world")
     if world_name is not None and world and world != world_name:
         return None
     for interface, module in registry.INTERFACES.items():
@@ -204,6 +207,14 @@ class AikoBackend(aiko.Actor):
         if command == "remove":
             self.records.pop(name, None)
             self.hub.remove_robot(name)
+            if name in self.replicas:
+                # The replica's row was deleted while its real robot is
+                # still about: stop speaking for it (it comes back when the
+                # real robot re-registers), else every telemetry tick
+                # would ask the world to move a robot it no longer has
+                source = next((s for s, (n, _) in self.real.items() if n == name), None)
+                if source:
+                    self.drop_replica(source)
             return
         pose = parse_pose_text(item_value)
         if pose:

@@ -29,7 +29,7 @@ from aiko_chat.protocol import _decode_message
 
 import config
 import robots as registry
-from core import RateLimiter, parse_actions
+from core import RateLimiter, normalise_command, parse_actions
 from interfaces import implements
 
 ACK_SUFFIX = " !!!!"
@@ -127,6 +127,7 @@ class ChatAgent(bot.ChatBot):
     def _command(self, text):
         # A robot command is sent as-is: the robot only acts on messages
         # that start with its mention, so the ack suffix must not be there
+        text = normalise_command(text)
         if self.chat_server:
             self.chat_server.send_message(
                 self.botname, [self.current_channel], text)
@@ -198,7 +199,8 @@ Recent channel history (oldest first):
 
 Reply ONLY with one or more lines, each in exactly one of these forms:
 (say TEXT)                        ;; a chat reply to the humans
-(command @@ROBOT COMMAND ARGS)    ;; one robot chat command, for example:
+(command @@ROBOT COMMAND ARGS)    ;; one robot chat command: the mention, a
+                                  ;; space, then the command, for example
                                   ;; (command @@my_turtle move 100)
 Lines are executed in order. Use several (command ...) lines for multi-step
 tasks. If the user names no robot and there is exactly one, use it; if there

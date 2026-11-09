@@ -212,7 +212,7 @@ versions of these tables.
 | `xgo_robot` | real | the XGO dog's Actor: `move x\|y STRIDE_MM` and `turn DEG/S` continuous until `stop`, `action NAME` from its table, `arm`, `claw` | the aiko_chat XGO example |
 | `turtle_robot` | legacy | the June-2026 tutorial turtle: `forward` `backward` `left` `right` `action` | `../old_tutorials` |
 | `lolibot` | proposed | `forward\|reverse\|left\|right [SECONDS]`, `stop`, `led R G B`, `speed %`: the updated firmware in `lolibot_mp/` | `../od_micro_py_files`, 2018 words kept |
-| `robot` | proposed | the Aiko-native `<Robot>`: `<Move>` `<Grasp>` `<Perceive>` `<Telemetry>` composed; `move` as a vector, `turn`, `stop`, `grasp`, `release`, `snapshot`, `get_telemetry`. Protocol `robot:0`; a virtual robot also chats and registers `chat_robot:0` | `interfaces.py` |
+| `robot` | proposed | the Aiko-native `<Robot>`: `<Move>` `<Grasp>` `<Perceive>` `<Telemetry>` composed; `move` as a vector, `turn`, `stop`, `grasp`, `release`, `snapshot`, `get_telemetry`. Protocol `robot:0`, virtual and real alike | `interfaces.py` |
 
 | kind | what it is | interfaces it may speak |
 |---|---|---|

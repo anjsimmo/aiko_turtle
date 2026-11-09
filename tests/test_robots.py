@@ -92,7 +92,7 @@ def test_kinds_and_resolution():
     assert "move=0" in robots.tags("robot", "turtle")
     assert "move=0" not in robots.tags("robot", "pi")
     module = robots.INTERFACES["robot"]
-    assert module.PROTOCOL.endswith("/robot:0") and module.VIRTUAL_PROTOCOL.endswith("/chat_robot:0")
+    assert module.PROTOCOL.endswith("/robot:0") and module.MATCH == {"protocol": module.PROTOCOL}
 
 
 def test_aiko_native_virtual_robot():

@@ -1,4 +1,4 @@
-from core import RateLimiter, parse_actions, valid_robot_name
+from core import RateLimiter, normalise_command, parse_actions, valid_robot_name
 
 
 def test_parse_actions():
@@ -43,3 +43,9 @@ def test_kinds():
     assert kind_commands("pi") == ["look", "telemetry"]        # no <Move>
     assert kind_interfaces("turtle") == ["turtle_robot", "robot"]  # legacy before proposed
     assert kind_interfaces("xgo")[0] == "xgo_robot"             # the real one first
+
+
+def test_normalise_command():
+    assert normalise_command("@@test.forward 100") == "@@test forward 100"
+    assert normalise_command("@@test forward 100") == "@@test forward 100"
+    assert normalise_command("@@test") == "@@test"

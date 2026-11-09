@@ -23,7 +23,6 @@ PROTOCOL_PREFIX = "ai.hashtag.ai"
 
 CHAT_PROTOCOL = f"{PROTOCOL_PREFIX}/chat:0"
 ROBOT_PROTOCOL = f"{PROTOCOL_PREFIX}/robot:0"
-CHAT_ROBOT_PROTOCOL = f"{PROTOCOL_PREFIX}/chat_robot:0"
 
 _PLUMBING = {"ABC", "object", "Interface", "ServiceProtocolInterface"}
 

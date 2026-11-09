@@ -48,7 +48,6 @@ from robots import base
 from interfaces import Chat, Robot
 from virtual_world import VirtualWorld
 
-ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"   # <Chat> + <Robot>: virtual robots with no protocol of their own
 REPLICA_PROTOCOL = "ai.hashtag.ai/replica:0"
 ACK_SUFFIX = " !!!!"            # loop-prevention convention, see aiko_chat.bot
 SANDBOX_TAG = "sandbox"         # sandbox=virtual | sandbox=replica: ours, in the Registrar
@@ -360,6 +359,26 @@ class ReplicaMixin:
         self.remove_message_handler(self._real_out_handler, f"{self.source}/out")
         self.remove_message_handler(self._replica_response_handler, self.replica_response_topic)
 
+    def _world_response_handler(self, _aiko, topic, payload_in):
+        # Every world call of a replica comes from dead reckoning, not from
+        # a person, so the world's replies are not chat: only "ready at"
+        # when the replica appears.  What is chat is the real robot's own
+        # "out" after a command (_real_out_handler).  Errors are logged
+        try:
+            command, fields = parse(payload_in)
+        except Exception:
+            return
+        if command != "response" or not fields:
+            return
+        if fields[0] == "create":
+            super()._world_response_handler(_aiko, topic, payload_in)
+        elif fields[0] == "error":
+            self.print("world: " + " ".join(str(f) for f in fields[1:]))
+        else:
+            pose = _pose(fields)
+            if pose:
+                self.last_pose = pose
+
     def _observe(self, direction, payload_in):
         try:
             command, arguments = parse(payload_in)
@@ -459,7 +478,7 @@ def robot_tags(robot_name, channel, kind, interface, world_name=config.WORLD_NAM
     has aspects (ADR-025), plus what the chat and the agent need.  Tag
     values hold no spaces, one property per tag"""
     tags = ["ec=true", f"{SANDBOX_TAG}={'replica' if replica_of else 'virtual'}",
-            "type=chat_robot", "chat=0", "robot=0", f"interface={interface}",
+            "type=robot", "chat=0", "robot=0", f"interface={interface}",
             f"botname=@@{robot_name}", f"channel={channel}", f"kind={kind}",
             f"world={world_name}",
             f"commands={','.join(registry.method_names(interface, kind))}"]
@@ -476,8 +495,7 @@ def host_robot(robot_name, kind=registry.DEFAULT_KIND, owner="anonymous",
     kind, interface = registry.resolve(kind, interface)
     module = registry.INTERFACES[interface]
     init_args = aiko.actor_args(
-        robot_name, protocol=getattr(module, "VIRTUAL_PROTOCOL", None)
-            or module.PROTOCOL or ROBOT_PROTOCOL,
+        robot_name, protocol=module.PROTOCOL or None,   # None: unknown, shown as "*"
         tags=robot_tags(robot_name, channel, kind, interface, world_name))
     init_args.update({"robot_name": robot_name, "channel": channel,
                       "world_name": world_name, "kind": kind,

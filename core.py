@@ -17,6 +17,11 @@ def valid_robot_name(name):
 _ACTION_PATTERN = re.compile(r"^\((say|command)\s+(.*)\)\s*$")
 
 
+def normalise_command(text):
+    """LLMs sometimes write "@@name.forward 100": the robot wants a space"""
+    return re.sub(r"^(@@\w+)\.(\w)", r"\1 \2", text.strip())
+
+
 def parse_actions(output):
     """LLM output -> [("say", text) | ("command", "@@bot move 100")]"""
     actions = []
