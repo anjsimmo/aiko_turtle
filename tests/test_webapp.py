@@ -33,8 +33,19 @@ class FakeBackend:
     def list_robots(self):
         return self.world.list()
 
-    def create_robot(self, name, kind, owner, x=0.0, y=0.0, heading=0.0):
-        return self._guard(self.world.create, name, kind, owner, "web", x, y, heading)
+    def create_robot(self, name, kind, owner, x=0.0, y=0.0, heading=0.0,
+                     interface=None):
+        return self._guard(self.world.create, name, kind, owner, "web", x, y,
+                           heading, interface)
+
+    def robot_info(self, name):
+        import kinds
+        robot = self.pose(name)
+        info = dict(robot, spec=kinds.describe_interface(robot["interface"], robot["kind"]),
+                    topic_path=f"aiko/fake/1/{name}")
+        if robot["host"] == "twin":
+            info["real_topic_path"] = robot["source"]
+        return info
 
     def place(self, name, x, y, heading, username):
         return self._guard(self.world.place, name, x, y, heading, username)
@@ -136,7 +147,10 @@ def test_chat_and_docs(client):
     assert client.get("/api/chat").json()[0]["username"] == "zoe"
     assert client.get("/docs").status_code == 200
     for path in ("/", "/world", "/chat", "/guide", "/system"):
-        assert "Turtle World" in client.get(path).text, path
+        assert "Aiko Sandbox" in client.get(path).text, path
+        assert "__TITLE__" not in client.get(path).text, path
+    assert "Testbed" in TestClient(create_app(client.backend, api_token="",
+                                              title="Testbed")).get("/").text
 
 
 def test_channels(client):
@@ -244,3 +258,37 @@ def test_event_replay_for_a_new_page(client):
     kinds = [event["kind"] for event in replay]
     assert kinds[0] == "status" and kinds.count("robot") == 2
     hub.unsubscribe(queue_)
+
+
+def test_interfaces_and_wire(client):
+    names = {i["name"]: i for i in client.get("/api/interfaces").json()}
+    assert names["irobot"]["status"] == "real" and names["proposed"]["status"] == "proposed"
+    spec = client.get("/api/interfaces/xgo_robot?kind=xgo").json()
+    assert "move" in [m["name"] for m in spec["methods"]]
+    assert client.get("/api/interfaces/nope").status_code == 404
+    assert client.post("/api/robots", json={"name": "pi1", "kind": "pi",
+                       "interface": "xgo_robot"}).status_code == 422
+    assert client.post("/api/robots", json={"name": "dog", "kind": "xgo"}).json()["interface"] == "xgo_robot"
+    info = client.get("/api/robots/dog/interface").json()
+    assert info["spec"]["name"] == "xgo_robot" and info["topic_path"].endswith("/dog")
+    wire = client.get("/api/robots/dog/wire?command=move x 100").json()
+    assert wire["payload"] == "(move x 100)" and wire["topic"] == "aiko/fake/1/dog/in"
+    assert "move" in wire["python"]
+    assert client.get("/api/robots/dog/wire?command=fly").status_code == 422
+    client.post("/api/robots", json={"name": "t1", "kind": "turtle", "interface": "turtle_robot"})
+    assert client.get("/api/robots/t1/wire?command=forward 10").json()["payload"] == "(forward 10)"
+    assert client.get("/sprites/turtle.js").status_code == 200
+    assert client.get("/sprites/nope.js").status_code == 404
+    assert client.get("/sprites/../index.js").status_code in (404, 422)
+
+
+def test_mqtt_events_many_topics(client):
+    with client.stream("GET", "/api/mqtt/events?topic=aiko/a/%23,aiko/b/%23") as r:
+        assert r.status_code == 200
+        lines = []
+        for line in r.iter_lines():
+            if line.startswith("data:"):
+                lines.append(line)
+            if len(lines) == 2:
+                break
+        assert "aiko/a/#" in lines[0] and "aiko/b/#" in lines[1]

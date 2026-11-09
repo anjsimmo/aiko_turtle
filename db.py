@@ -17,12 +17,15 @@ metadata = MetaData()
 robots = Table("robots", metadata,
     Column("name", String(64), primary_key=True),
     Column("kind", String(32), nullable=False, default="turtle"),
+    Column("interface", String(32), nullable=False, default="proposed"),
     Column("owner", String(64), nullable=False, default="anonymous"),
     Column("host", String(32), nullable=False, default="external"),
+    Column("source", String(128), nullable=False, default=""),   # a twin: the real robot's topic path
     Column("x", Float, nullable=False, default=0.0),
     Column("y", Float, nullable=False, default=0.0),
     Column("heading", Float, nullable=False, default=0.0),
     Column("z", Float, nullable=False, default=0.0),      # altitude (drones)
+    Column("pen", Integer, nullable=False, default=1),     # 1: leaves a trail
     Column("created_at", Float, nullable=False),
     Column("updated_at", Float, nullable=False),
 )
@@ -39,6 +42,15 @@ events = Table("events", metadata,
     Column("heading", Float, nullable=False),
     Column("z", Float, nullable=False, default=0.0),
 )
+
+_ROBOT_COLUMNS = ("kind", "interface", "owner", "host", "source",
+                  "x", "y", "heading", "z", "pen")
+_ADDED = {        # columns added since the first release: name -> SQL type and default
+    "z": "FLOAT NOT NULL DEFAULT 0.0",
+    "interface": "VARCHAR(32) NOT NULL DEFAULT 'proposed'",
+    "source": "VARCHAR(128) NOT NULL DEFAULT ''",
+    "pen": "INTEGER NOT NULL DEFAULT 1",
+}
 
 
 class Database:
@@ -61,10 +73,11 @@ class Database:
             for table in (robots, events):
                 present = {column["name"]
                            for column in inspector.get_columns(table.name)}
-                if "z" not in present:
-                    connection.execute(text(
-                        f"ALTER TABLE {table.name} "
-                        f"ADD COLUMN z FLOAT NOT NULL DEFAULT 0.0"))
+                for column in table.columns:
+                    if column.name not in present and column.name in _ADDED:
+                        connection.execute(text(
+                            f"ALTER TABLE {table.name} "
+                            f"ADD COLUMN {column.name} {_ADDED[column.name]}"))
 
     # -- robots ------------------------------------------------------------
 
@@ -86,9 +99,7 @@ class Database:
             exists = connection.execute(
                 select(robots.c.name).where(robots.c.name == record["name"])
             ).first()
-            values = {key: record[key]
-                      for key in ("kind", "owner", "host", "x", "y", "heading")}
-            values["z"] = record.get("z", 0.0)
+            values = {key: record[key] for key in _ROBOT_COLUMNS if key in record}
             values["updated_at"] = now
             if exists:
                 connection.execute(update(robots)
@@ -110,7 +121,7 @@ class Database:
         with self.engine.begin() as connection:
             connection.execute(insert(events).values(
                 timestamp=time.time(), robot=robot, username=username,
-                command=command, argument=str(argument),
+                command=command, argument=str(argument)[:64],
                 x=x, y=y, heading=heading, z=z))
 
     def list_events(self, robot, limit=100):

@@ -28,6 +28,7 @@ import aiko_chat.bot as bot
 from aiko_chat.protocol import _decode_message
 
 import config
+import robots as registry
 from core import RateLimiter, parse_actions
 from interfaces import implements
 
@@ -86,7 +87,8 @@ class ChatAgent(bot.ChatBot):
                 details = {"name": service_details[1]}
                 for tag in tags:
                     key, _, value = str(tag).partition("=")
-                    if key in ("botname", "channel", "commands", "kind"):
+                    if key in ("botname", "channel", "commands", "kind",
+                               "interface", "sandbox"):
                         details[key] = value
                 robots.append(details)
         return robots
@@ -158,24 +160,36 @@ class ChatAgent(bot.ChatBot):
             self._say(output[:280] if output else "agent: no response")
 
     def _build_prompt(self, username, request, robots):
-        robot_lines = [
-            f"- {robot.get('botname', '@@' + robot['name'])}"
-            f" (kind {robot.get('kind', '?')}),"
-            f" chat commands: {robot.get('commands', 'unknown')}"
-            for robot in robots]
+        robot_lines, interfaces = [], {}
+        for robot in robots:
+            interface = robot.get("interface", "")
+            robot_lines.append(
+                f"- {robot.get('botname', '@@' + robot['name'])}"
+                f" (kind {robot.get('kind', '?')}, interface {interface or '?'},"
+                f"{' a TWIN of a real robot,' if robot.get('sandbox') == 'twin' else ''}"
+                f" functions: {robot.get('commands', 'unknown')})")
+            if interface in registry.INTERFACES and interface not in interfaces:
+                module = registry.INTERFACES[interface]
+                examples = "; ".join(f"{example}: {help_text}" for example, help_text
+                                     in registry.commands(interface, robot.get("kind")))
+                interfaces[interface] = (f"- {interface} ({module.STATUS}; "
+                                         f"{module.UNITS}): {examples}")
         robots_text = "\n".join(robot_lines) or "(no robots discovered)"
+        interfaces_text = "\n".join(interfaces.values()) or "(none)"
         history_text = "\n".join(self.history[-_HISTORY_LIMIT:])
         return f"""You are {self.botname}, an agent in the #{self.current_channel} channel of a robot chat system.
 You control robots by sending them chat commands that start with their mention.
+Each robot speaks ONE interface, in its own words and units; use only the
+commands of that interface, exactly as the examples show.
 
 Discovered robots:
 {robots_text}
 
-Command semantics: move D moves D units forward (negative = backwards),
-turn A turns A degrees counter-clockwise, reset returns to the origin,
-grasp/release close and open a gripper (arms only), look reports the pose,
-telemetry reports battery, interfaces lists interfaces.  Each robot lists
-the commands its kind supports; never send one it does not list.
+The interfaces, with example commands and what they mean:
+{interfaces_text}
+
+Every robot also takes: help, place X Y [H] (teleport, sandbox only).
+A twin forwards your command to a real robot: be careful and brief.
 
 Recent channel history (oldest first):
 {history_text}

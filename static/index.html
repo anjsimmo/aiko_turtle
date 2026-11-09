@@ -1,13 +1,13 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Turtle World</title>
+<html><head><meta charset="utf-8"><title>__TITLE__</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 :root { --bg:#f7f6f2; --surface:#ffffff; --ink:#1c2420; --muted:#5c6b62;
-        --line:#d8ded9; --accent:#0b7a4b; --bot:#2456a6; --me:#eef7f1; --danger:#b23a3a; --warn:#8a5a00; --warnbg:#fff6e0; }
+        --line:#d8ded9; --accent:#0b7a4b; --bot:#2456a6; --me:#eef7f1; --danger:#b23a3a; --warn:#8a5a00; --warnbg:#fff6e0; --twin:#7b3fa0; }
 @media (prefers-color-scheme: dark) {
   :root { --bg:#101512; --surface:#182019; --ink:#e6ece7; --muted:#93a398;
-          --line:#2a352c; --accent:#3ecf8e; --bot:#8fb4ff; --me:#1f2d24; --danger:#ff7b7b; --warn:#ffd27a; --warnbg:#2a2412; }
+          --line:#2a352c; --accent:#3ecf8e; --bot:#8fb4ff; --me:#1f2d24; --danger:#ff7b7b; --warn:#ffd27a; --warnbg:#2a2412; --twin:#c9a0f0; }
 }
 * { box-sizing:border-box; }
 body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 24px;
@@ -15,6 +15,7 @@ body { background:var(--bg); color:var(--ink); margin:0; padding:0 16px 24px;
        align-items:center; min-height:100vh; }
 header { width:min(100%,1240px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 18px; margin:20px 0 4px; }
 h1 { font-family:"Sora",sans-serif; font-size:1.3rem; margin:0; }
+h1 .tag { font-family:"IBM Plex Mono",monospace; font-weight:normal; font-size:0.78rem; color:var(--muted); margin-left:10px; }
 nav { display:flex; flex-wrap:wrap; align-items:center; gap:14px; font-size:0.8rem; margin-left:auto; }
 nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { color:var(--accent); }
 #lock { display:none; align-items:center; gap:5px; background:none; color:var(--muted); border:1px solid var(--line); padding:3px 8px; font-size:0.74rem; }
@@ -22,14 +23,16 @@ nav a { color:var(--muted); text-decoration:none; } nav a:hover, nav a.here { co
 #tokenbar { display:none; width:min(100%,1240px); align-items:center; gap:10px; margin:0 0 12px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); font-size:0.74rem; color:var(--muted); flex-wrap:wrap; }
 #tokenbar.show { display:flex; }
 #tokenbar input { flex:1 1 22em; min-width:0; }
+#intro { width:min(100%,1240px); color:var(--muted); font-size:0.78rem; margin:0 0 8px; line-height:1.5; max-width:1240px; }
+#intro a { color:var(--accent); }
 #status { color:var(--muted); font-size:0.78rem; margin-bottom:14px; width:min(100%,1240px); display:flex; gap:14px; flex-wrap:wrap; }
 #status .warn { color:var(--warn); }
 #grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px;
         width:min(100%,1240px); align-items:start; }
 @media (max-width: 900px) { #grid { grid-template-columns:1fr; } }
 body.view-world #grid, body.view-chat #grid { grid-template-columns:1fr; width:min(100%,900px); }
-body.view-world #status, body.view-world #tokenbar, body.view-chat #status, body.view-chat #tokenbar, body.view-world header, body.view-chat header { width:min(100%,900px); }
-body.view-world #chatpanel, body.view-chat #worldpanel { display:none; }
+body.view-world #status, body.view-world #tokenbar, body.view-chat #status, body.view-chat #tokenbar, body.view-world header, body.view-chat header, body.view-world #intro, body.view-chat #intro { width:min(100%,900px); }
+body.view-world #chatpanel, body.view-chat #worldpanel, body.view-world #intro, body.view-chat #intro { display:none; }
 body.view-chat #messages { height:min(70vh,900px); }
 .panel { background:var(--surface); border:1px solid var(--line); border-radius:6px;
          padding:12px; min-width:0; }
@@ -45,22 +48,35 @@ canvas.dragging { cursor:grabbing; }
 #robots { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px; font-size:0.78rem; }
 #robots li { display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:4px; padding:4px 8px; cursor:pointer; }
 #robots li.selected { border-color:var(--accent); background:var(--me); }
+#robots li.offline { opacity:0.55; }
 #robots .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
 #robots .kind { color:var(--muted); font-size:0.7rem; }
+#robots .badge { font-size:0.66rem; border-radius:3px; padding:0 5px; background:var(--me); color:var(--accent); }
+#robots .badge.twin { color:var(--twin); background:none; border:1px dashed var(--twin); }
+#robots .badge.off { color:var(--muted); border-color:var(--muted); }
 #robots .x { color:var(--danger); background:none; border:none; padding:0 2px; font-size:0.9rem; }
-#create { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+#create { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+#create a { font-size:0.72rem; }
+#advanced { display:none; gap:6px; margin-top:6px; flex-wrap:wrap; align-items:center; font-size:0.74rem; color:var(--muted); }
+#advanced.show { display:flex; }
 input, select { font-family:inherit; font-size:0.8rem; padding:5px 8px;
    border:1px solid var(--line); border-radius:4px; background:var(--bg); color:var(--ink); }
 #pose { color:var(--accent); font-size:0.8rem; margin-top:8px; min-height:1.2em; }
-#kindinfo { color:var(--muted); font-size:0.74rem; margin-top:6px; line-height:1.5; }
-#kindinfo code { color:var(--accent); }
+#kindinfo, #iface { color:var(--muted); font-size:0.74rem; margin-top:6px; line-height:1.5; }
+#kindinfo code, #iface code { color:var(--accent); }
+#iface b { color:var(--ink); font-weight:500; }
+#iface .real { color:var(--twin); }
+#iface details { margin-top:4px; } #iface summary { cursor:pointer; }
+#iface table { border-collapse:collapse; font-size:0.7rem; margin:4px 0; }
+#iface td { padding:1px 8px 1px 0; vertical-align:top; } #iface td:first-child { color:var(--accent); white-space:nowrap; }
 .hintline { color:var(--muted); font-size:0.7rem; margin-top:4px; }
+.hintline label { cursor:pointer; }
 button { font-family:"IBM Plex Mono",monospace; font-size:0.78rem;
          background:var(--accent); color:var(--bg); border:none;
          border-radius:4px; padding:6px 12px; cursor:pointer; }
 button:hover { opacity:0.88; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--muted); outline-offset:2px; }
-#messages { list-style:none; margin:0; padding:0; height:min(55vh,480px); overflow-y:auto;
+#messages { list-style:none; margin:0; padding:0; height:min(45vh,420px); overflow-y:auto;
             border:1px solid var(--line); border-radius:4px; font-size:0.82rem; }
 #messages li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:0 8px;
                padding:6px 10px; border-bottom:1px solid var(--line); word-break:break-word; }
@@ -75,22 +91,36 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:2px so
 #chips button { background:var(--surface); color:var(--ink); border:1px solid var(--line); }
 #chips button:hover { border-color:var(--accent); opacity:1; }
 #chips button:disabled { opacity:0.35; cursor:default; border-color:var(--line); }
-#send { display:flex; gap:8px; }
-#text, #who { font-size:0.85rem; padding:8px 10px; }
+#layers { display:flex; gap:4px; align-items:center; font-size:0.72rem; color:var(--muted); margin:0 0 6px; flex-wrap:wrap; }
+#layers button { background:var(--surface); color:var(--muted); border:1px solid var(--line); padding:2px 9px; font-size:0.72rem; }
+#layers button.on { color:var(--accent); border-color:var(--accent); }
+#layerhelp { color:var(--muted); font-size:0.7rem; margin:0 0 6px; line-height:1.5; }
+#send { display:flex; gap:8px; flex-wrap:wrap; }
+#text, #who, #topic, #payload { font-size:0.85rem; padding:8px 10px; }
 #text { flex:1; min-width:0; } #who { width:9em; }
+#topic { flex:1 1 100%; min-width:0; display:none; } #payload { flex:1; min-width:0; display:none; }
+body.layer-mqtt #text { display:none; } body.layer-mqtt #topic, body.layer-mqtt #payload { display:block; }
+#wirebox { display:none; margin-top:8px; padding:8px 10px; border:1px solid var(--line); border-radius:4px; font-size:0.72rem; background:var(--bg); white-space:pre-wrap; word-break:break-all; }
+#wirebox.show { display:block; }
 #hint { display:none; margin-top:8px; padding:8px 10px; border-radius:4px; font-size:0.76rem;
         background:var(--warnbg); color:var(--warn); border:1px solid var(--line); }
 #hint.show { display:block; }
 #hint code { font-weight:500; }
+#wire { margin-top:10px; font-size:0.74rem; color:var(--muted); }
+#wire summary { cursor:pointer; }
+#wirelog { max-height:220px; overflow:auto; background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:8px; font-size:0.68rem; margin:6px 0 0; white-space:pre-wrap; word-break:break-all; }
+#wirelog .t { color:var(--accent); }
+#wirelog .in { color:var(--bot); } #wirelog .out { color:var(--twin); }
 a { color:var(--accent); }
-</style></head><body class="view-__VIEW__">
+</style></head><body class="view-__VIEW__ layer-chat">
 <header>
-  <h1>Turtle World</h1>
+  <h1>__TITLE__<span class="tag">virtual robots, real interfaces</span></h1>
   <nav>
     <a href="/" id="nav-home">home</a><a href="/world" id="nav-world">world</a><a href="/chat" id="nav-chat">chat</a><a href="/guide">guide</a><a href="/system">system</a><a href="/docs">API</a><a href="https://github.com/anjsimmo/aiko_turtle" title="source code">github</a>
     <button id="lock" type="button" title="API token" aria-expanded="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> token</button>
   </nav>
 </header>
+<p id="intro">Create a virtual robot that speaks a <em>real</em> robot's interface (the iRobot's, the XGO dog's, the LoliBot's, or the June-2026 tutorial turtle's), drive it over the chat, over Aiko, or over HTTP, and test your code before you touch the real one. Real robots on the community broker appear here as <span style="color:var(--twin)">twins</span>. New here? Read the <a href="/guide">guide</a>.</p>
 <div id="tokenbar"><label for="token">API token</label><input id="token" type="text" spellcheck="false" placeholder="paste the token"><span id="tokennote">sent with every create, drive and chat; the same <code>Authorization: Bearer …</code> header works for curl and scripts</span></div>
 <div id="status"><span id="conn">connecting…</span><span id="connhelp" class="warn"></span></div>
 <main id="grid">
@@ -102,21 +132,30 @@ a { color:var(--accent); }
     <input id="newname" value="@@" aria-label="new robot name" pattern="@*[A-Za-z0-9][A-Za-z0-9_-]{0,63}" spellcheck="false" required>
     <select id="newkind" aria-label="kind"></select>
     <button type="submit">create robot</button>
+    <a href="#" id="advtoggle">advanced</a>
   </form>
+  <div id="advanced"><label for="newiface">interface it speaks</label><select id="newiface" aria-label="interface"></select><span id="ifacenote"></span></div>
   <div id="kindinfo"></div>
   <div id="pose"></div>
-  <div class="hintline" id="maphelp">scroll to zoom, drag the ground to pan, drag a robot to move it</div>
+  <div id="iface"></div>
+  <div class="hintline" id="maphelp">scroll to zoom, drag the ground to pan, drag a robot to move it · <label><input type="checkbox" id="showtwins" checked> show real robots (twins)</label><span id="twincount"></span></div>
 </section>
 <section class="panel" id="chatpanel">
   <h2>#<select id="channel" aria-label="channel"></select> <span id="chatstate"></span><a href="/chat">full chat</a></h2>
   <ol id="messages"><li id="empty">no messages yet</li></ol>
   <div id="chips"></div>
+  <div id="layers">send as <button type="button" data-layer="chat" class="on" title="a chat message: the robot's ChatBot picks it up from the channel">chat</button><button type="button" data-layer="aiko" title="a remote function call on the robot's Actor, what the chat does underneath">aiko</button><button type="button" data-layer="mqtt" title="the raw MQTT message, what Aiko does underneath">mqtt</button></div>
+  <div id="layerhelp"></div>
   <form id="send" autocomplete="off">
     <input id="who" aria-label="your name" title="your name (anything you like; humans are @name)">
     <input id="text" placeholder="@@robot move 100 — or ask __AGENT__" aria-label="message">
-    <button type="submit">send</button>
+    <input id="topic" placeholder="aiko/HOST/PID/SID/in" aria-label="MQTT topic" spellcheck="false">
+    <input id="payload" placeholder="(move 100)" aria-label="MQTT payload" spellcheck="false">
+    <button type="submit" id="sendbtn">send</button>
   </form>
+  <div id="wirebox"></div>
   <div id="hint"></div>
+  <details id="wire"><summary>on the wire: the selected robot's MQTT topics, live</summary><pre id="wirelog">(select a robot)</pre></details>
 </section>
 </main>
 <script>
@@ -144,6 +183,7 @@ function showToken(open) {
   tokenbar.className = open ? "show" : ""; lock.className = open ? "show open" : "show"; lock.setAttribute("aria-expanded", open);
 }
 lock.addEventListener("click", function () { showToken(tokenbar.className !== "show"); });
+var CHAT_TOPIC = null;
 if (AUTH) {
   lock.className = "show";
   fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
@@ -163,21 +203,46 @@ function api(path, method, body) {
 }
 function explain(res) { return res.body && res.body.detail ? (typeof res.body.detail === "string" ? res.body.detail : JSON.stringify(res.body.detail)) : "HTTP " + res.status; }
 
-// ---- kinds ------------------------------------------------------------------
-var KINDS = {}, kindSelect = document.getElementById("newkind");
+// ---- kinds, interfaces and sprites -------------------------------------------
+// A kind is a body (a sprite, how many axes it moves in); an interface is what
+// the robot speaks.  Each kind lists the interfaces it may speak, its own first.
+var KINDS = {}, IFACES = {}, SPRITES = {}, kindSelect = document.getElementById("newkind"), ifaceSelect = document.getElementById("newiface");
+fetch("/api/interfaces").then(function (r) { return r.json(); }).then(function (list) { list.forEach(function (i) { IFACES[i.name] = i; }); describeKind(); });
 fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list) {
   list.forEach(function (k) {
     KINDS[k.name] = k;
     var o = document.createElement("option"); o.value = k.name; o.textContent = k.label; kindSelect.append(o);
+    var s = document.createElement("script"); s.src = "/sprites/" + k.sprite + ".js"; s.onload = draw; document.head.append(s);
   });
-  kindSelect.value = load("turtle.kind", "turtle"); describeKind();
+  kindSelect.value = load("turtle.kind", "turtle"); if (!KINDS[kindSelect.value]) kindSelect.value = list[0].name;
+  describeKind();
 });
+function statusWord(i) { return i ? (i.status === "real" ? "real robot" : i.status === "legacy" ? "legacy" : "proposed") : ""; }
 function describeKind() {
   var k = KINDS[kindSelect.value]; if (!k) return;
-  document.getElementById("kindinfo").textContent = k.description + " — <" + k.interfaces.join("> <") + ">";
   store("turtle.kind", kindSelect.value);
+  var was = ifaceSelect.value; ifaceSelect.innerHTML = "";
+  k.interfaces.forEach(function (name) {
+    var o = document.createElement("option"); o.value = name; var i = IFACES[name];
+    o.textContent = name + (i ? " (" + statusWord(i) + ")" : ""); ifaceSelect.append(o);
+  });
+  ifaceSelect.value = k.interfaces.indexOf(was) >= 0 ? was : k.interfaces[0];
+  describeInterface();
+}
+function describeInterface() {
+  var k = KINDS[kindSelect.value], i = IFACES[ifaceSelect.value]; if (!k) return;
+  document.getElementById("kindinfo").innerHTML = "";
+  var t = document.getElementById("kindinfo");
+  t.append(k.description + " — speaks ");
+  var c = document.createElement("code"); c.textContent = ifaceSelect.value; t.append(c);
+  if (i) t.append(" (" + statusWord(i) + "): " + i.description);
+  document.getElementById("ifacenote").textContent = i ? "e.g. " + i.commands.slice(0, 4).map(function (c) { return c.example; }).join(", ") : "";
 }
 kindSelect.addEventListener("change", describeKind);
+ifaceSelect.addEventListener("change", describeInterface);
+document.getElementById("advtoggle").addEventListener("click", function (e) {
+  e.preventDefault(); var a = document.getElementById("advanced"); a.className = a.className ? "" : "show";
+});
 
 // ---- the world --------------------------------------------------------------
 var canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
@@ -189,6 +254,12 @@ if (!ctx.roundRect) {
   };
 }
 var robots = {}, selected = null;
+var showTwins = document.getElementById("showtwins");
+showTwins.checked = load("turtle.twins", "yes") !== "no";
+showTwins.addEventListener("change", function () { store("turtle.twins", showTwins.checked ? "yes" : "no"); if (!visible(selected)) selected = null; renderRobots(); draw(); });
+function isTwin(r) { return r && r.host === "twin"; }
+function visible(name) { var r = robots[name]; return !!r && (showTwins.checked || !isTwin(r)); }
+function shown() { return Object.keys(robots).filter(visible); }
 var PALETTE = ["#0b7a4b","#2456a6","#b5651d","#7b3fa0","#b23a3a","#1f8a8a","#8a7a1f","#c2185b"];
 function colorOf(name) {
   var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -196,12 +267,12 @@ function colorOf(name) {
 }
 function colors() {
   var s = getComputedStyle(document.documentElement);
-  return { line: s.getPropertyValue("--line").trim(), muted: s.getPropertyValue("--muted").trim(), bg: s.getPropertyValue("--surface").trim() };
+  return { line: s.getPropertyValue("--line").trim(), muted: s.getPropertyValue("--muted").trim(), bg: s.getPropertyValue("--surface").trim(), twin: s.getPropertyValue("--twin").trim() };
 }
 var cam = null;     // null: fit every robot and trail; else a fixed view {cx, cy, span}
 function fitBounds() {
   var xs = [0], ys = [0];
-  Object.values(robots).forEach(function (r) { r.trail.forEach(function (p) { xs.push(p[0]); ys.push(p[1]); }); });
+  shown().forEach(function (name) { robots[name].trail.forEach(function (p) { if (p) { xs.push(p[0]); ys.push(p[1]); } }); });
   var minX = Math.min.apply(null, xs) - 60, maxX = Math.max.apply(null, xs) + 60;
   var minY = Math.min.apply(null, ys) - 60, maxY = Math.max.apply(null, ys) + 60;
   var span = Math.max(maxX - minX, maxY - minY, 300);
@@ -247,7 +318,7 @@ function draw() {
   var o = T([0, 0]);
   ctx.fillStyle = c.muted; ctx.beginPath(); ctx.arc(o[0], o[1], 3, 0, 7); ctx.fill();
   ctx.font = "10px 'IBM Plex Mono',monospace"; ctx.fillText("0,0", o[0] + 6, o[1] - 5);
-  var names = Object.keys(robots);
+  var names = shown();
   if (!names.length) {
     ctx.fillStyle = c.muted; ctx.font = "12px 'IBM Plex Mono',monospace";
     ctx.fillText("no robots yet — create one below", 20, 30);
@@ -256,21 +327,31 @@ function draw() {
   names.forEach(function (name) {
     var r = robots[name], col = colorOf(name), sp = T([r.x, r.y]);
     if (sp[0] < -10 || sp[0] > S + 10 || sp[1] < -10 || sp[1] > S + 10) offscreen.push([name, sp, col]);
-    if (r.trail.length > 1) {
+    var dim = isTwin(r) && !r.online;
+    ctx.globalAlpha = dim ? 0.35 : (name === selected || !selected ? 1 : 0.6);
+    if (r.trail.length > 1) {                      // null breaks the trail: pen up
       ctx.strokeStyle = col; ctx.lineWidth = name === selected ? 3 : 2; ctx.lineCap = "round";
-      ctx.globalAlpha = name === selected || !selected ? 1 : 0.5;
-      ctx.beginPath(); var p0 = T(r.trail[0]); ctx.moveTo(p0[0], p0[1]);
-      for (var i = 1; i < r.trail.length; i++) { var p = T(r.trail[i]); ctx.lineTo(p[0], p[1]); }
-      ctx.stroke(); ctx.globalAlpha = 1;
+      if (isTwin(r)) ctx.setLineDash([6, 5]);
+      ctx.beginPath(); var pen = false;
+      for (var i = 0; i < r.trail.length; i++) {
+        var p = r.trail[i]; if (!p) { pen = false; continue; }
+        var q = T(p); if (pen) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); pen = true;
+      }
+      ctx.stroke(); ctx.setLineDash([]);
     }
     var rp = (dragging && dragging.name === name) ? dragging.at : T([r.x, r.y]);
     var z = r.z || 0, scale = 1 + Math.min(z, 200) / 200;      // altitude: bigger, with a shadow
     if (z > 0) { ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.beginPath(); ctx.ellipse(rp[0], rp[1] + 6 + z / 10, 16 * scale, 8 * scale, 0, 0, 7); ctx.fill(); }
+    if (isTwin(r)) {                               // a real robot's replica: a dashed ring
+      ctx.strokeStyle = c.twin; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.arc(rp[0], rp[1], 27 * scale, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    }
     ctx.save(); ctx.translate(rp[0], rp[1]); ctx.scale(scale, scale); ctx.translate(-rp[0], -rp[1]);
     drawSprite(r.type, rp[0], rp[1], r.heading * Math.PI / 180, c, col);
     ctx.restore();
     ctx.fillStyle = col; ctx.font = "11px 'IBM Plex Mono',monospace";
-    ctx.fillText(name + (z > 0 ? " \u2191" + z.toFixed(0) : ""), rp[0] + 22 * scale, rp[1] + 24 * scale);
+    ctx.fillText(name + (z > 0 ? " ↑" + z.toFixed(0) : "") + (isTwin(r) ? (r.online ? " (twin)" : " (twin, offline)") : "") + (r.moving ? " …" : ""), rp[0] + 22 * scale, rp[1] + 24 * scale);
+    ctx.globalAlpha = 1;
   });
   // robots outside the view: an arrow on the edge pointing their way, with the name
   offscreen.forEach(function (o) {
@@ -281,12 +362,12 @@ function draw() {
     ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, 7); ctx.lineTo(-3, 0); ctx.lineTo(-6, -7); ctx.closePath(); ctx.fill();
     ctx.restore();
     ctx.fillStyle = col; ctx.font = "10px 'IBM Plex Mono',monospace"; ctx.textAlign = ex > S * 0.7 ? "right" : "left";
-    ctx.fillText(name + " \u2192 " + Math.round(Math.hypot(robots[name].x - (b.minX + b.span / 2), robots[name].y - (b.minY + b.span / 2))), ex + (ex > S * 0.7 ? -14 : 14), ey + (ey < 20 ? 14 : ey > S - 20 ? -8 : 4));
+    ctx.fillText(name + " → " + Math.round(Math.hypot(robots[name].x - (b.minX + b.span / 2), robots[name].y - (b.minY + b.span / 2))), ex + (ex > S * 0.7 ? -14 : 14), ey + (ey < 20 ? 14 : ey > S - 20 ? -8 : 4));
     ctx.textAlign = "left";
   });
   var sel = robots[selected];
   document.getElementById("pose").textContent = sel ?
-    selected + " (" + (sel.type || "?") + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) + ((sel.z || 0) > 0 ? "  z=" + sel.z.toFixed(1) : "") : "";
+    selected + " (" + (sel.type || "?") + "):  x=" + sel.x.toFixed(1) + "  y=" + sel.y.toFixed(1) + "  heading=" + sel.heading.toFixed(1) + ((sel.z || 0) > 0 ? "  z=" + sel.z.toFixed(1) : "") + (sel.moving ? "  moving" : "") + (sel.pen === false ? "  pen up" : "") : "";
 }
 
 // ---- drag a robot to teleport it (any kind) ---------------------------------
@@ -298,7 +379,7 @@ function canvasPoint(e) {
 canvas.addEventListener("pointerdown", function (e) {
   if (!view) return;
   var q = canvasPoint(e), hit = null, best = 24;
-  Object.keys(robots).forEach(function (name) {
+  shown().forEach(function (name) {
     var p = view.T([robots[name].x, robots[name].y]), d = Math.hypot(p[0] - q[0], p[1] - q[1]);
     if (d < best) { best = d; hit = name; }
   });
@@ -308,7 +389,7 @@ canvas.addEventListener("pointerdown", function (e) {
     canvas.setPointerCapture(e.pointerId); canvas.className = "dragging"; e.preventDefault();
     return;
   }
-  dragging = { name: hit, at: q, moved: false }; selected = hit; renderRobots(); draw();
+  dragging = { name: hit, at: q, moved: false }; select(hit);
   canvas.setPointerCapture(e.pointerId); canvas.className = "dragging"; e.preventDefault();
 });
 var panning = null;
@@ -335,9 +416,9 @@ function endDrag(e) {
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", endDrag);
 
-// ---- sprites: top-down, nose along +x, one function per kind (kinds.py) -----
-var SPRITES = { turtle: drawTurtle, lolibot: drawLoliBot, xgo: drawXGO, lekiwi: drawLeKiwi,
-                so101: drawSO101, drone: drawDrone, pi: drawPi, arrow: drawArrow };
+// ---- sprites: one file per kind in static/sprites/, loaded from /api/kinds -----
+// Each registers SPRITES.NAME = function (c, col) {...}: top-down, nose along
+// +x, about 40 px across.  These helpers are theirs to use.
 function drawSprite(kind, x, y, rad, c, col) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(-rad);
   (SPRITES[kind] || drawArrow)(c, col);
@@ -345,65 +426,6 @@ function drawSprite(kind, x, y, rad, c, col) {
 }
 function rr(x, y, w, h, r, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); }
 function dot(x, y, r, fill) { ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
-function drawArrow(c, col) {
-  ctx.fillStyle = col; ctx.beginPath();
-  ctx.moveTo(18, 0); ctx.lineTo(-12, 11); ctx.lineTo(-6, 0); ctx.lineTo(-12, -11); ctx.closePath(); ctx.fill();
-}
-function drawTurtle(c, col) {
-  var skin = "#8fb55a";
-  [[-7, 12, 40], [7, 12, 140], [7, -12, -140], [-7, -12, -40]].forEach(function (l) {       // legs
-    ctx.save(); ctx.translate(l[0], l[1]); ctx.rotate(l[2] * Math.PI / 180);
-    rr(-3, -3, 12, 6, 3, skin); ctx.restore();
-  });
-  rr(-22, -2, 8, 4, 2, skin);                                                            // tail
-  dot(18, 0, 6, skin); dot(21, -2.5, 1.2, "#1c1c1e"); dot(21, 2.5, 1.2, "#1c1c1e");   // head
-  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;                    // shell
-  ctx.beginPath(); ctx.ellipse(0, 0, 16, 13, 0, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(0, 0, 8, 6, 0, 0, 7); ctx.stroke();
-  [0, 60, 120, 180, 240, 300].forEach(function (deg) {
-    var a = deg * Math.PI / 180; ctx.beginPath(); ctx.moveTo(8 * Math.cos(a), 6 * Math.sin(a)); ctx.lineTo(15 * Math.cos(a), 12 * Math.sin(a)); ctx.stroke();
-  });
-}
-// Stylised LoliBot (openhardwareconf.org): PCB chassis in the robot's
-// colour, yellow-hub wheels, red 18650 battery, ESP32, underglow
-function drawLoliBot(c, col) {
-  var glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 30);
-  glow.addColorStop(0, "rgba(62,207,142,0.45)"); glow.addColorStop(1, "rgba(62,207,142,0)");
-  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 30, 0, 7); ctx.fill();
-  function wheel(wy) { rr(-2, wy - 5, 22, 10, 5, "#1c1c1e"); rr(4, wy - 2, 10, 4, 2, "#f0b429"); }
-  wheel(-17); wheel(17);
-  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(-16, -13); ctx.quadraticCurveTo(-21, 0, -16, 13); ctx.lineTo(8, 13);
-  ctx.quadraticCurveTo(22, 8, 25, 0); ctx.quadraticCurveTo(22, -8, 8, -13); ctx.closePath(); ctx.fill(); ctx.stroke();
-  rr(-2, -10, 6, 20, 3, "#c03535"); ctx.fillStyle = "#e8e2d4"; ctx.fillRect(-2, -10, 6, 2.5);
-  rr(-13, -6, 8, 12, 1.5, "#232323");
-  dot(18, 0, 1.8, "#ff5348");
-  ctx.fillStyle = "#cfcfcf"; ctx.strokeStyle = "#8a8a8a"; ctx.beginPath(); ctx.arc(-17, 0, 2.5, 0, 7); ctx.fill(); ctx.stroke();
-}
-// XGO: a quadruped seen from above, legs splayed, head with camera forward
-function drawXGO(c, col) {
-  [[10, 13, 25], [10, -13, -25], [-12, 13, 155], [-12, -13, -155]].forEach(function (l) {
-    ctx.save(); ctx.translate(l[0], l[1]); ctx.rotate(l[2] * Math.PI / 180);
-    rr(-2, -3, 13, 6, 3, "#3a3a3c"); dot(12, 0, 3, "#1c1c1e"); ctx.restore();
-  });
-  rr(-20, -2, 6, 4, 2, "#3a3a3c");                                                  // tail
-  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(-18, -9, 34, 18, 6); ctx.fill(); ctx.stroke();      // body
-  rr(12, -7, 14, 14, 4, "#2a2a2c");                                                 // head
-  dot(23, 0, 2.5, "#4fd1ff"); dot(22, -5, 1.2, "#ff5348"); dot(22, 5, 1.2, "#ff5348"); // camera, LEDs
-  rr(13, -11, 5, 3, 1, "#2a2a2c"); rr(13, 8, 5, 3, 1, "#2a2a2c");                   // ears
-}
-// LeKiwi: round omni base with three wheels at 120 degrees, SO-101 arm forward
-function drawLeKiwi(c, col) {
-  [90, 210, 330].forEach(function (deg) {
-    ctx.save(); ctx.rotate(deg * Math.PI / 180); rr(-5, 15, 10, 6, 2, "#1c1c1e"); ctx.restore();
-  });
-  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(0, 0, 16, 0, 7); ctx.fill(); ctx.stroke();
-  dot(0, 0, 4, "#2a2a2c");
-  arm(0, 0, 14, 12, "#e9e4d8");
-  dot(-9, 0, 2, "#4fd1ff");                                                          // camera
-}
 function arm(x, y, l1, l2, shade) {
   ctx.strokeStyle = shade; ctx.lineCap = "round"; ctx.lineWidth = 5;
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + l1, y - 4); ctx.lineTo(x + l1 + l2, y); ctx.stroke();
@@ -411,60 +433,42 @@ function arm(x, y, l1, l2, shade) {
   ctx.moveTo(x + l1 + l2, y - 4); ctx.lineTo(x + l1 + l2 + 6, y - 4); ctx.moveTo(x + l1 + l2, y + 4); ctx.lineTo(x + l1 + l2 + 6, y + 4); ctx.stroke();
   dot(x, y, 3, "#5a5a5c"); dot(x + l1, y - 4, 2.5, "#5a5a5c");
 }
-// SO-101: an arm on a square base plate; it does not drive
-function drawSO101(c, col) {
-  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(-14, -14, 28, 28, 3); ctx.fill(); ctx.stroke();
-  [[-10, -10], [10, -10], [-10, 10], [10, 10]].forEach(function (p) { dot(p[0], p[1], 1.5, "#5a5a5c"); });
-  rr(-6, -6, 12, 12, 2, "#2a2a2c");
-  arm(0, 0, 14, 12, "#f0b429");
-}
-// Drone: X frame, four rotors, red nose
-function drawDrone(c, col) {
-  ctx.strokeStyle = "#3a3a3c"; ctx.lineWidth = 3; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(-14, -14); ctx.lineTo(14, 14); ctx.moveTo(-14, 14); ctx.lineTo(14, -14); ctx.stroke();
-  [[14, 14], [14, -14], [-14, 14], [-14, -14]].forEach(function (p) {
-    ctx.strokeStyle = "rgba(120,120,120,0.55)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, 7); ctx.stroke();
-    dot(p[0], p[1], 2.5, "#1c1c1e");
-  });
-  ctx.fillStyle = col; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(-9, -6, 18, 12, 4); ctx.fill(); ctx.stroke();
-  dot(8, 0, 2, "#ff5348"); dot(-7, 0, 1.6, "#4fd1ff");
-}
-// Raspberry Pi: green board, small display, USB and Ethernet, GPIO header
-function drawPi(c, col) {
-  ctx.fillStyle = "#2f7d3a"; ctx.strokeStyle = c.line; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(-17, -12, 34, 24, 2); ctx.fill(); ctx.stroke();
-  rr(-15, -10, 18, 20, 1, col); rr(-13, -8, 14, 16, 1, "#101418");                 // display
-  ctx.fillStyle = "#4fd1ff"; ctx.font = "7px 'IBM Plex Mono',monospace"; ctx.fillText("hi", -9, 2);
-  rr(6, -11, 5, 22, 1, "#1c1c1e"); for (var i = -9; i < 11; i += 3) dot(8.5, i, 0.7, "#f0b429"); // GPIO
-  rr(12, -10, 5, 8, 1, "#9a9a9a"); rr(12, 2, 5, 8, 1, "#9a9a9a");                  // USB, Ethernet
-  dot(-16, 9, 1.2, "#ff5348"); dot(-16, 6, 1.2, "#3ecf8e");                        // PWR, ACT
+function drawArrow(c, col) {               // a kind with no sprite yet
+  ctx.fillStyle = col; ctx.beginPath();
+  ctx.moveTo(18, 0); ctx.lineTo(-12, 11); ctx.lineTo(-6, 0); ctx.lineTo(-12, -11); ctx.closePath(); ctx.fill();
 }
 
 // ---- robots list ----------------------------------------------------------
 var list = document.getElementById("robots");
 function renderRobots() {
   list.innerHTML = "";
+  var hidden = 0;
   Object.keys(robots).sort().forEach(function (name) {
+    var r = robots[name];
+    if (!visible(name)) { hidden++; return; }
     var li = document.createElement("li");
-    li.className = name === selected ? "selected" : "";
+    li.className = (name === selected ? "selected" : "") + (isTwin(r) && !r.online ? " offline" : "");
     var d = document.createElement("span"); d.className = "dot"; d.style.background = colorOf(name);
     var label = document.createElement("span"); label.textContent = name;
-    var kind = document.createElement("span"); kind.className = "kind"; kind.textContent = robots[name].type || "";
+    var kind = document.createElement("span"); kind.className = "kind"; kind.textContent = r.type || "";
+    li.append(d, label, kind);
+    if (isTwin(r)) { var b = document.createElement("span"); b.className = "badge twin" + (r.online ? "" : " off"); b.textContent = r.online ? "twin" : "twin, offline"; b.title = "the replica of a real robot" + (r.online ? "" : " that is not on the broker right now"); li.append(b); }
+    else if (r.host === "external") { var b2 = document.createElement("span"); b2.className = "badge"; b2.textContent = "own process"; b2.title = "someone runs this robot in their own process (robot.py run)"; li.append(b2); }
     var x = document.createElement("button"); x.className = "x"; x.type = "button"; x.title = "remove " + name; x.textContent = "×";
     x.addEventListener("click", function (e) {
       e.stopPropagation();
-      if (confirm("Remove robot " + name + "?")) api("/api/robots/" + name, "DELETE").then(function (res) {
+      if (confirm("Remove robot " + name + (isTwin(r) ? " (the twin; the real robot is untouched and comes back when seen again)" : "") + "?")) api("/api/robots/" + name, "DELETE").then(function (res) {
         if (!res.ok) document.getElementById("pose").textContent = "remove failed: " + explain(res);
       });
     });
-    li.append(d, label, kind, x);
-    li.addEventListener("click", function () { selected = name; renderRobots(); renderChips(); draw(); });
+    li.append(x);
+    li.addEventListener("click", function () { select(name); });
     list.append(li);
   });
+  document.getElementById("twincount").textContent = hidden ? " (" + hidden + " hidden)" : "";
   renderChips();
 }
+function select(name) { var changed = name !== selected; selected = name; renderRobots(); draw(); if (changed) { describeSelected(); watchWire(); } }
 var newname = document.getElementById("newname");
 newname.addEventListener("focus", function () { if (!newname.value) newname.value = "@@"; });
 newname.addEventListener("input", function () { if (!newname.value.startsWith("@@")) newname.value = "@@" + newname.value.replace(/^@+/, ""); });
@@ -482,12 +486,41 @@ document.getElementById("create").addEventListener("submit", function (e) {
   e.preventDefault();
   var name = newname.value.trim().replace(/^@+/, ""), spot = freeSpot();
   if (!name) { document.getElementById("pose").textContent = "type a name after the @@"; return; }
-  api("/api/robots", "POST", { name: name, kind: kindSelect.value, owner: me(),
-      x: Math.round(spot[0]), y: Math.round(spot[1]), heading: Math.round(Math.random() * 360) }).then(function (res) {
+  var body = { name: name, kind: kindSelect.value, owner: me(), x: Math.round(spot[0]), y: Math.round(spot[1]), heading: Math.round(Math.random() * 360) };
+  if (ifaceSelect.value) body.interface = ifaceSelect.value;
+  api("/api/robots", "POST", body).then(function (res) {
     if (!res.ok) { document.getElementById("pose").textContent = "create failed: " + explain(res); return; }
-    selected = name; newname.value = "@@"; renderRobots(); draw();
+    newname.value = "@@"; select(name);
   });
 });
+
+// ---- the selected robot's interface: what it speaks, where it is on the bus ---
+var INFO = {};      // robot name -> /api/robots/NAME/interface
+function describeSelected() {
+  var box = document.getElementById("iface"); box.innerHTML = "";
+  if (!selected) { renderChips(); return; }
+  api("/api/robots/" + selected + "/interface").then(function (res) {
+    if (!res.ok || selected !== res.body.name) return;
+    var info = res.body, spec = info.spec || {}; INFO[selected] = info;
+    box.innerHTML = "";
+    var head = document.createElement("div");
+    head.append("speaks "); var c = document.createElement("code"); c.textContent = info.interface; head.append(c);
+    var st = document.createElement("span"); st.className = spec.status === "real" ? "real" : ""; st.textContent = " (" + statusWord(spec) + (spec.units ? "; " + spec.units : "") + ")"; head.append(st);
+    head.append(" · " + (info.host === "twin" ? "twin of a real robot" : info.host === "web" ? "virtual, hosted by the web server" : "virtual, in its owner's own process"));
+    box.append(head);
+    var tp = document.createElement("div"); tp.append("Actor topic path: "); var t = document.createElement("code"); t.textContent = info.topic_path || "(no live process)"; tp.append(t);
+    if (info.real_topic_path) { tp.append(" · the real robot: "); var t2 = document.createElement("code"); t2.textContent = info.real_topic_path; tp.append(t2); }
+    box.append(tp);
+    var det = document.createElement("details"), sum = document.createElement("summary");
+    sum.textContent = "interface spec: " + (spec.methods || []).length + " functions on its in topic" + (spec.source ? " (from " + spec.source + ")" : ""); det.append(sum);
+    var tbl = document.createElement("table");
+    (spec.methods || []).forEach(function (m) { var tr = document.createElement("tr"); var a = document.createElement("td"); a.textContent = m.name + m.signature; var b = document.createElement("td"); b.textContent = m.doc; tr.append(a, b); tbl.append(tr); });
+    det.append(tbl);
+    if (spec.description) { var p = document.createElement("div"); p.textContent = spec.description; det.append(p); }
+    box.append(det);
+    renderChips(); updateLayerHelp();
+  });
+}
 
 // ---- chat -------------------------------------------------------------------
 var messages = document.getElementById("messages"), channelSelect = document.getElementById("channel");
@@ -513,7 +546,7 @@ function setChannel(name) {
     if (!res.ok) document.getElementById("chatstate").textContent = "cannot follow #" + channel + ": " + explain(res);
     refreshChannels();
   });
-  redrawMessages();
+  redrawMessages(); watchWire();
 }
 function redrawMessages() {
   messages.innerHTML = "";
@@ -550,12 +583,12 @@ function checkConventions(text) {
   var bare = first.replace(/^@+/, "");
   var isRobot = names.indexOf(bare) >= 0, isAgent = ("@@" + bare) === AGENT || bare === AGENT.replace(/^@+/, "");
   if ((isRobot || isAgent) && !first.startsWith("@@")) {
-    showHint("Robots and agents only answer messages that <em>start</em> with a double at: <code>@@" + bare + " move 100</code>. Or ask the agent: <code>" + AGENT + " move " + (isRobot ? bare : "a robot") + " in a star shape</code>.");
+    showHint("Robots and agents only answer messages that <em>start</em> with a double at: <code>@@" + bare + " help</code>. Or ask the agent: <code>" + AGENT + " move " + (isRobot ? bare : "a robot") + " in a star shape</code>.");
     return;
   }
   if (!/@@/.test(text)) {
     var mentioned = names.filter(function (n) { return text.indexOf(n) >= 0; })[0];
-    if (mentioned) showHint("Talking about <code>" + mentioned + "</code>? To drive it, start the message with <code>@@" + mentioned + "</code>, e.g. <code>@@" + mentioned + " turn 90</code> — or let <code>" + AGENT + "</code> do it: <code>" + AGENT + " move " + mentioned + " in a star shape</code>.");
+    if (mentioned) showHint("Talking about <code>" + mentioned + "</code>? To drive it, start the message with <code>@@" + mentioned + "</code>, e.g. <code>@@" + mentioned + " help</code> — or let <code>" + AGENT + "</code> do it: <code>" + AGENT + " move " + mentioned + " in a star shape</code>.");
   }
 }
 function send(text) {
@@ -565,22 +598,64 @@ function send(text) {
     if (!res.ok) document.getElementById("chatstate").textContent = "send failed: " + explain(res);
   });
 }
-document.getElementById("send").addEventListener("submit", function (e) {
-  e.preventDefault(); var box = document.getElementById("text"); send(box.value); box.value = "";
+
+// ---- the layers: chat -> aiko -> mqtt ------------------------------------------
+// The same command, three ways down the stack.  "chat" is a message in the
+// channel that the robot's ChatBot picks up; "aiko" is the remote function
+// call the ChatBot makes, an S-expression on the Actor's "in" topic; "mqtt"
+// is that very MQTT message, typed by hand.  The wire log below shows them
+// arrive.
+var layer = "chat", wirebox = document.getElementById("wirebox"), textBox = document.getElementById("text");
+var topicBox = document.getElementById("topic"), payloadBox = document.getElementById("payload");
+document.querySelectorAll("#layers button").forEach(function (b) {
+  b.addEventListener("click", function () { setLayer(b.getAttribute("data-layer")); });
 });
+function setLayer(name) {
+  layer = name; document.body.className = document.body.className.replace(/layer-\w+/, "layer-" + name);
+  document.querySelectorAll("#layers button").forEach(function (b) { b.className = b.getAttribute("data-layer") === name ? "on" : ""; });
+  wirebox.className = ""; updateLayerHelp();
+  if (name === "mqtt") { var info = INFO[selected]; if (info && !topicBox.value) topicBox.value = (info.real_topic_path || info.topic_path || "") + "/in"; }
+}
+function updateLayerHelp() {
+  var h = document.getElementById("layerhelp"), info = INFO[selected], name = selected || "ROBOT";
+  if (layer === "chat") { h.textContent = "a chat message in #" + channel + ": the robot's ChatBot reads the channel and acts on messages that start with @@" + name + ". Buttons above fill one in."; textBox.placeholder = "@@" + name + " " + (info && info.spec.commands[0] ? info.spec.commands[0].example : "help") + " — or ask " + AGENT; }
+  else if (layer === "aiko") { h.textContent = "a remote function call on @@" + name + "'s Actor: type the command without the mention (e.g. " + (info && info.spec.commands[0] ? info.spec.commands[0].example : "help") + "); the page shows the S-expression it becomes and publishes it to the Actor's in topic" + (info && info.host === "twin" ? " (a twin: straight to the REAL robot)" : "") + "."; textBox.placeholder = info && info.spec.commands[0] ? info.spec.commands[0].example : "move 100"; }
+  else { h.textContent = "the raw MQTT message: a topic and an S-expression payload, exactly what Aiko sends. Any Service on the broker can be called this way (see /system)."; }
+}
+document.getElementById("send").addEventListener("submit", function (e) {
+  e.preventDefault();
+  if (layer === "chat") { send(textBox.value); textBox.value = ""; return; }
+  if (layer === "mqtt") { publish(topicBox.value.trim(), payloadBox.value.trim()); return; }
+  var cmd = textBox.value.trim(); if (!cmd) return;
+  if (!selected) { wirebox.textContent = "select a robot first"; wirebox.className = "show"; return; }
+  api("/api/robots/" + selected + "/wire?command=" + encodeURIComponent(cmd)).then(function (res) {
+    if (!res.ok) { wirebox.textContent = "cannot send: " + explain(res); wirebox.className = "show"; return; }
+    var w = res.body;
+    wirebox.textContent = "# Python, over Aiko (what the chat does underneath):\n" + w.python + "\n\n# which publishes, on the Actor's in topic:\n" + (w.topic || "(no live process)") + "\n" + w.payload;
+    wirebox.className = "show";
+    topicBox.value = w.topic || ""; payloadBox.value = w.payload;
+    if (w.topic) publish(w.topic, w.payload);
+    textBox.value = "";
+  });
+});
+function publish(topic, payload) {
+  if (!topic || !payload) { wirebox.textContent = "topic and payload needed"; wirebox.className = "show"; return; }
+  api("/api/mqtt", "POST", { topic: topic, payload: payload }).then(function (res) {
+    if (!res.ok) { wirebox.textContent = "publish failed: " + explain(res); wirebox.className = "show"; return; }
+    if (layer === "mqtt") { wirebox.textContent = "published to " + topic + ": " + payload + "\n(watch the wire log below for the reply; the robot answers in the chat too)"; wirebox.className = "show"; }
+  });
+}
 var chips = document.getElementById("chips");
 function renderChips() {
   chips.innerHTML = "";
-  var sel = robots[selected], kind = sel && KINDS[sel.type], allowed = kind ? kind.commands : null;
-  var axes = kind ? kind.axes : 1;
-  [["move 100", "move", 1], ["turn 90", "turn", 1], ["move 0 50", "move", 2], ["move 0 0 30", "move", 3], ["move 0 0 -30", "move", 3], ["grasp", "grasp", 1], ["release", "release", 1], ["look", "look", 1], ["reset", "reset", 1], ["telemetry", "telemetry", 1]].forEach(function (cmd) {
+  var sel = robots[selected], info = INFO[selected], kind = sel && KINDS[sel.type];
+  var examples = info ? info.spec.commands.map(function (c) { return [c.example, c.help]; }) : (kind ? kind.commands.map(function (c) { return [c, ""]; }) : [["help", "what can it do"]]);
+  examples.slice(0, 12).concat([["help", "what this robot takes"]]).forEach(function (cmd) {
     var b = document.createElement("button"); b.type = "button"; b.textContent = cmd[0];
-    b.disabled = !!(allowed && allowed.indexOf(cmd[1]) < 0) || !!(kind && cmd[1] === "move" && cmd[2] > axes);
-    if (cmd[2] > 1) b.title = cmd[2] === 2 ? "sideways: omni wheels and walkers" : "up or down: drones";
-    if (!b.title) b.title = b.disabled ? "a " + sel.type + " cannot " + cmd[0] : "send @@" + (selected || "robot") + " " + cmd[0];
+    b.title = (cmd[1] ? cmd[1] + " — " : "") + "send @@" + (selected || "robot") + " " + cmd[0];
     b.addEventListener("click", function () {
       if (!selected) { document.getElementById("pose").textContent = "select or create a robot first"; return; }
-      send("@@" + selected + " " + cmd[0]);
+      if (layer === "chat") send("@@" + selected + " " + cmd[0]); else { setLayer("aiko"); textBox.value = cmd[0]; document.getElementById("sendbtn").click(); }
     });
     chips.append(b);
   });
@@ -588,11 +663,42 @@ function renderChips() {
   ask.addEventListener("click", function () { send(AGENT + " move " + (selected || "a robot") + " in a star shape"); });
   chips.append(ask);
 }
-renderChips();
+renderChips(); updateLayerHelp();
+
+// ---- the wire log: the selected robot's topics, live, over one SSE stream ------
+var wire = document.getElementById("wire"), wirelog = document.getElementById("wirelog"), wireSource = null, wireLines = 0;
+wire.open = load("turtle.wire", "closed") === "open";
+wire.addEventListener("toggle", function () { store("turtle.wire", wire.open ? "open" : "closed"); watchWire(); });
+function watchWire() {
+  if (wireSource) { wireSource.close(); wireSource = null; }
+  if (!wire.open) return;
+  var info = INFO[selected];
+  if (!selected) { wirelog.textContent = "(select a robot)"; return; }
+  if (!info) { setTimeout(watchWire, 500); return; }        // the interface call is on its way
+  var topics = [];
+  if (info.topic_path) topics.push(info.topic_path + "/#");
+  if (info.real_topic_path) topics.push(info.real_topic_path + "/#");
+  if (CHAT_TOPIC) topics.push(CHAT_TOPIC + "/" + channel);
+  if (!topics.length) { wirelog.textContent = "(no live process for " + selected + ")"; return; }
+  var t = token.value.trim();
+  if (AUTH && !t) { wirelog.textContent = "token needed: see the lock at the top"; return; }
+  wirelog.textContent = "watching " + topics.join("  ") + "\n"; wireLines = 1;
+  wireSource = new EventSource("/api/mqtt/events?topic=" + encodeURIComponent(topics.join(",")) + (t ? "&token=" + encodeURIComponent(t) : ""));
+  wireSource.onmessage = function (ev) {
+    var m = JSON.parse(ev.data), leaf = m.topic.split("/").pop(), line = document.createElement("div");
+    var ts = document.createElement("span"); ts.className = "t"; ts.textContent = new Date(m.timestamp * 1000).toTimeString().slice(0, 8) + "  ";
+    var tp = document.createElement("span"); tp.className = leaf === "in" ? "in" : leaf === "out" || leaf === "world_response" ? "out" : ""; tp.textContent = m.topic + "  ";
+    line.append(ts, tp, m.payload); wirelog.append(line);
+    if (++wireLines > 200) { wirelog.firstChild.remove(); }
+    wirelog.scrollTop = wirelog.scrollHeight;
+  };
+  wireSource.onerror = function () { if (wireSource && wireSource.readyState === EventSource.CLOSED) wirelog.textContent += "\n(stream closed)"; };
+}
 
 function setStatus(s) {
   document.getElementById("world").textContent = s.world ? "live" : "waiting for world";
   document.getElementById("chatstate").textContent = s.chat ? "connected" : "waiting for chat server";
+  if (s.chat && s.chat !== CHAT_TOPIC) { CHAT_TOPIC = s.chat; if (wireSource) watchWire(); }
 }
 // ---- the live stream ----------------------------------------------------------
 // A WebSocket first: browsers do not count it against their ~6 HTTP
@@ -608,25 +714,28 @@ function handle(data) {
   var d = JSON.parse(data);
   if (d.kind === "chat") { addMessage(d); return; }
   if (d.kind === "status") { setStatus(d); return; }
-  if (d.kind === "robot_removed") { delete robots[d.name]; if (selected === d.name) selected = null; renderRobots(); draw(); return; }
+  if (d.kind === "robot_removed") { delete robots[d.name]; delete INFO[d.name]; if (selected === d.name) { selected = null; describeSelected(); watchWire(); } renderRobots(); draw(); return; }
   if (d.kind !== "robot") return;
   var r = robots[d.name];
-  if (!r) { r = robots[d.name] = { trail: [] }; if (!selected) selected = d.name; }
-  var changedKind = r.type !== d.type;
-  r.x = d.x; r.y = d.y; r.heading = d.heading; r.z = d.z || 0; r.type = d.type;
-  if (changedKind) renderRobots();
+  if (!r) { r = robots[d.name] = { trail: [], online: true }; }
+  var changed = r.type !== d.type || r.host !== d.host || r.online !== d.online || r.interface !== d.interface;
+  r.x = d.x; r.y = d.y; r.heading = d.heading; r.z = d.z || 0; r.type = d.type; r.host = d.host; r.interface = d.interface;
+  r.online = d.online !== false; r.moving = !!d.moving; r.pen = d.pen !== false;
+  if (changed) { renderRobots(); if (d.name === selected) { delete INFO[d.name]; describeSelected(); } }
+  if (!selected && visible(d.name)) select(d.name);
   var last = r.trail[r.trail.length - 1];
-  if (!last || last[0] !== d.x || last[1] !== d.y) r.trail.push([d.x, d.y]);
+  if (!r.pen) { if (last) r.trail.push(null); }
+  else if (!last || last[0] !== d.x || last[1] !== d.y) r.trail.push([d.x, d.y]);
   if (r.trail.length > 2000) r.trail.shift();
   draw();
 }
 function connect() {
   if (live) return;
   robots = {}; history = {}; selected = null; renderRobots(); redrawMessages(); draw();
-  setConn("connecting\u2026");
+  setConn("connecting…");
   clearTimeout(liveTimer);
   liveTimer = setTimeout(function () {
-    setConn("still connecting\u2026", "if other Turtle World tabs are open, close them: a browser allows only a few connections per site without HTTP/2");
+    setConn("still connecting…", "if other tabs of this site are open, close them: a browser allows only a few connections per site without HTTP/2");
   }, 4000);
   if (!useSSE && "WebSocket" in window) {
     var ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"), opened = false;
@@ -636,7 +745,7 @@ function connect() {
     ws.onclose = function () {
       live = null; clearTimeout(liveTimer);
       if (!opened) { useSSE = true; connect(); return; }     // no WebSocket here: use SSE
-      setConn("reconnecting\u2026"); setTimeout(connect, 2000);
+      setConn("reconnecting…"); setTimeout(connect, 2000);
     };
     ws.onerror = function () {};
     return;
@@ -644,15 +753,16 @@ function connect() {
   var es = new EventSource("/events");
   live = { close: function () { es.close(); } };
   es.onopen = function () { clearTimeout(liveTimer); setConn("live"); };
-  es.onerror = function () { setConn("reconnecting\u2026"); };
+  es.onerror = function () { setConn("reconnecting…"); };
   es.onmessage = function (m) { handle(m.data); };
 }
 function disconnect() {
   if (!live) return;
   live.close(); live = null; clearTimeout(liveTimer);
+  if (wireSource) { wireSource.close(); wireSource = null; }
   setConn("paused while hidden");
 }
-document.addEventListener("visibilitychange", function () { if (document.hidden) disconnect(); else connect(); });
+document.addEventListener("visibilitychange", function () { if (document.hidden) disconnect(); else { connect(); watchWire(); } });
 window.addEventListener("pagehide", disconnect);
 connect();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);

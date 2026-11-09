@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
 #
-# VirtualWorld Actor: the shared virtual "hardware" every turtle lives in.
-# Holds every robot's pose, persists them (db.py, TURTLE_DATABASE_URL) and
-# publishes them as the share "robots.<name>" = "(x y heading kind)".
+# VirtualWorld Actor: the shared virtual "hardware" every robot lives in.
+# Holds every robot's pose, persists them (db.py, TURTLE_DATABASE_URL),
+# integrates continuous motion ten times a second, and publishes each
+# pose as the share "robots.<name>" = "(x y heading kind z pen interface
+# host moving)".
 #
 # Remote functions (each optional "topic_path_response" gets
 # "(item_count 1)" then "(response <command> name x y heading kind z)" or
-# "(response error <reason>)"; list_robots adds host and owner):
+# "(response error <reason>)"; list_robots adds host, owner, interface,
+# source and pen):
 #
-#   create_robot name [kind] [owner] [host] [topic_path_response] [x y heading]
+#   create_robot name [kind] [owner] [host] [topic_path_response] [x y heading] [interface] [source]
 #   destroy_robot name [topic_path_response]
+#   set_host name host [source] [topic_path_response]
 #   apply_move name distance [username] [topic_path_response]   ;; distance: N or (F L U)
 #   apply_turn name angle    [username] [topic_path_response]
+#   apply_drive name forward left angular seconds [username] [topic_path_response]
+#   apply_stop name [username] [topic_path_response]
+#   set_pen name down|up [username] [topic_path_response]
 #   reset name [x y heading] [username] [topic_path_response]  ;; no x y: the origin
 #   get_pose name topic_path_response
-#   list_robots topic_path_response        ;; N responses, with host and owner
+#   list_robots topic_path_response        ;; N responses
 #   get_history name limit topic_path_response
 #
 # Usage
@@ -31,6 +38,7 @@ import config
 from world_model import World, WorldError, pose_text
 
 WORLD_PROTOCOL = "ai.hashtag.ai/virtual_world:0"
+TICK_PERIOD = 0.1               # s: the integrator for continuous motion
 
 
 class VirtualWorld(aiko.Actor):
@@ -43,6 +51,10 @@ class VirtualWorld(aiko.Actor):
             self._changed("loaded", record)
         print(f"WORLD: {len(self.world.robots)} robots loaded from "
               f"{database_url}", flush=True)
+        aiko.event.add_timer_handler(self._tick, TICK_PERIOD)
+
+    def _tick(self):
+        self.world.tick()
 
     # -- share ---------------------------------------------------------------
 
@@ -52,7 +64,8 @@ class VirtualWorld(aiko.Actor):
             self.ec_producer.remove(f"robots.{name}")
         else:
             self.ec_producer.update(f"robots.{name}", pose_text(record))
-        print(f"WORLD: {event} {name} {pose_text(record)}", flush=True)
+        if event != "moved" or not record.get("moving"):
+            print(f"WORLD: {event} {name} {pose_text(record)}", flush=True)
 
     # -- responses -----------------------------------------------------------
 
@@ -62,9 +75,7 @@ class VirtualWorld(aiko.Actor):
         if isinstance(result, WorldError):
             fields = ["error", str(result)]
         else:
-            fields = [command, result["name"], f"{result['x']:.3f}",
-                      f"{result['y']:.3f}", f"{result['heading']:.3f}",
-                      result["kind"], f"{result.get('z', 0.0):.3f}"]
+            fields = [command, *_pose_fields(result)]
         aiko.process.message.publish(topic_path_response, "(item_count 1)")
         aiko.process.message.publish(
             topic_path_response, generate("response", fields))
@@ -81,12 +92,16 @@ class VirtualWorld(aiko.Actor):
 
     def create_robot(self, name, kind="turtle", owner="anonymous",
                      host="external", topic_path_response=None,
-                     x=0.0, y=0.0, heading=0.0):
-        self._do("create", topic_path_response,
-                 self.world.create, name, kind, owner, host, x, y, heading)
+                     x=0.0, y=0.0, heading=0.0, interface="", source=""):
+        self._do("create", topic_path_response, self.world.create, name, kind,
+                 owner, host, x, y, heading, interface or None, source)
 
     def destroy_robot(self, name, topic_path_response=None):
         self._do("destroy", topic_path_response, self.world.destroy, name)
+
+    def set_host(self, name, host, source="-", topic_path_response=None):
+        self._do("host", topic_path_response, self.world.set_host, name, host,
+                 None if source == "-" else source)
 
     def apply_move(self, name, distance, username="anonymous",
                    topic_path_response=None):
@@ -97,6 +112,19 @@ class VirtualWorld(aiko.Actor):
                    topic_path_response=None):
         self._do("turn", topic_path_response,
                  self.world.turn, name, angle, username)
+
+    def apply_drive(self, name, forward, left=0.0, angular=0.0, seconds=0.0,
+                    username="anonymous", topic_path_response=None):
+        self._do("drive", topic_path_response, self.world.drive, name,
+                 forward, left, angular, seconds, username)
+
+    def apply_stop(self, name, username="anonymous", topic_path_response=None):
+        self._do("stop", topic_path_response, self.world.stop, name, username)
+
+    def set_pen(self, name, down="down", username="anonymous",
+                topic_path_response=None):
+        self._do("pen", topic_path_response, self.world.set_pen, name, down,
+                 username)
 
     def reset(self, name, x=0.0, y=0.0, heading=0.0, username="anonymous",
               topic_path_response=None):
@@ -112,11 +140,7 @@ class VirtualWorld(aiko.Actor):
             topic_path_response, f"(item_count {len(records)})")
         for record in records:
             aiko.process.message.publish(topic_path_response,
-                generate("response", ["robot", record["name"],
-                    f"{record['x']:.3f}", f"{record['y']:.3f}",
-                    f"{record['heading']:.3f}", record["kind"],
-                    f"{record.get('z', 0.0):.3f}",
-                    record["host"], record["owner"]]))
+                generate("response", ["robot", *_pose_fields(record)]))
 
     def get_history(self, name, limit, topic_path_response):
         try:
@@ -133,6 +157,16 @@ class VirtualWorld(aiko.Actor):
                     event["argument"] or "-", f"{event['x']:.3f}",
                     f"{event['y']:.3f}", f"{event['heading']:.3f}",
                     f"{event.get('z', 0.0):.3f}"]))
+
+
+def _pose_fields(record):
+    """name x y heading kind z host owner interface source pen moving"""
+    return [record["name"], f"{record['x']:.3f}", f"{record['y']:.3f}",
+            f"{record['heading']:.3f}", record["kind"],
+            f"{record.get('z', 0.0):.3f}", record.get("host", "external"),
+            record.get("owner", "anonymous"), record.get("interface", "proposed"),
+            record.get("source") or "-", "down" if record.get("pen", 1) else "up",
+            "moving" if record.get("moving") else "still"]
 
 
 @click.group()

@@ -8,6 +8,7 @@ from world_model import World, WorldError, parse_pose_text, pose_text
 def test_create_move_turn_reset():
     world = World("sqlite://")
     assert world.create("t1") == {"name": "t1", "kind": "turtle",
+        "interface": "proposed", "source": "", "pen": 1, "moving": False,
         "owner": "anonymous", "host": "external",
         "x": 0.0, "y": 0.0, "heading": 0.0, "z": 0.0}
     assert world.turn("t1", "90")["heading"] == 90.0
@@ -43,8 +44,8 @@ def test_history_and_destroy():
     world.turn("t1", 2, username="bob")
     history = world.history("t1")
     assert [(h["username"], h["command"], h["argument"]) for h in history] \
-        == [("anonymous", "create", "turtle"), ("alice", "move", "1.0"),
-            ("bob", "turn", "2.0")]
+        == [("anonymous", "create", "turtle,proposed"), ("alice", "move", "1"),
+            ("bob", "turn", "2")]
     world.destroy("t1")
     assert world.list() == []
     assert changes == ["created", "moved", "moved", "destroyed"]
@@ -67,11 +68,15 @@ def test_errors():
 
 
 def test_pose_text_round_trip():
-    record = {"x": 1.5, "y": -2.0, "heading": 270.0, "kind": "arrow", "z": 4.0}
-    assert pose_text(record) == "(1.500 -2.000 270.000 arrow 4.000)"
+    record = {"x": 1.5, "y": -2.0, "heading": 270.0, "kind": "xgo", "z": 4.0,
+              "pen": 0, "interface": "xgo_robot", "host": "twin", "moving": True}
+    assert pose_text(record) == \
+        "(1.500 -2.000 270.000 xgo 4.000 up xgo_robot twin moving)"
     assert parse_pose_text(pose_text(record)) == record
     assert parse_pose_text(["1", "2", "3"]) == \
-        {"x": 1.0, "y": 2.0, "heading": 3.0, "kind": "turtle", "z": 0.0}
+        {"x": 1.0, "y": 2.0, "heading": 3.0, "kind": "turtle", "z": 0.0,
+         "pen": 1, "interface": "proposed", "host": "external", "moving": False}
+    assert parse_pose_text("(1 2 3 arrow 4)")["kind"] == "arrow"  # an older world
     assert parse_pose_text("nonsense") is None
 
 
@@ -111,3 +116,36 @@ def test_migration_adds_z_to_an_old_database(tmp_path):
     world = World(f"sqlite:///{path}")
     assert world.get("old")["z"] == 0.0
     assert world.move("old", 1)["z"] == 0.0
+
+
+def test_drive_integrates_until_stopped():
+    now = [100.0]
+    world = World("sqlite://")
+    world.clock = lambda: now[0]
+    world.create("dog", kind="xgo")
+    pose = world.drive("dog", 10.0, 0.0, 0.0, 2.0)    # 10 units/s forward
+    assert pose["moving"] is True and pose["x"] == 0.0
+    world.tick(101.0)
+    assert world.get("dog")["x"] == 10.0
+    world.tick(103.0)                                 # past the two seconds
+    dog = world.get("dog")
+    assert dog["x"] == 20.0 and dog["moving"] is False
+    now[0] = 103.0
+    world.drive("dog", 0.0, 0.0, 90.0, 0)             # turn until stop
+    world.tick(104.0)
+    assert world.get("dog")["heading"] == 90.0
+    world.stop("dog")
+    world.tick(110.0)
+    assert world.get("dog")["heading"] == 90.0 and not world.get("dog")["moving"]
+
+
+def test_pen_and_interface_and_host():
+    world = World("sqlite://")
+    robot = world.create("r", kind="irobot", interface="irobot", host="twin",
+                         source="aiko/zebra2/1/1")
+    assert (robot["interface"], robot["host"], robot["source"]) == \
+        ("irobot", "twin", "aiko/zebra2/1/1")
+    with pytest.raises(WorldError):
+        world.create("x", kind="pi", interface="xgo_robot")   # a Pi cannot be a dog
+    assert world.set_pen("r", False)["pen"] == 0
+    assert world.set_host("r", "web")["host"] == "web"

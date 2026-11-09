@@ -1,13 +1,10 @@
-# Pure logic shared by the robot, the LLM agent and the tests: chat
-# command parsing, LLM output parsing, a token-bucket rate limiter and the
-# robot name rule.  No Aiko imports, so it is testable without a broker.
+# Pure logic shared by the robot, the LLM agent and the tests: LLM
+# output parsing, a token-bucket rate limiter and the robot name rule.
+# Chat command parsing lives with each interface in robots/.  No Aiko imports, so it is testable without a broker.
 
 import re
 import threading
 import time
-
-COMMANDS = ("move D | move F L [U], turn A, stop, reset [X Y [H]], "
-            "grasp, release, look, telemetry, interfaces, join C")
 
 ROBOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
@@ -15,40 +12,6 @@ ROBOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 def valid_robot_name(name):
     """Names go into MQTT topics, S-expressions, tags and @@mentions"""
     return bool(ROBOT_NAME_PATTERN.match(name or ""))
-
-
-def parse_command(text):
-    """A robot chat command -> (method, [arguments]) or (None, error)"""
-    parts = (text or "").split()
-    match parts:
-        case ["move", distance]:
-            return "move", [distance]
-        case ["move", forward, left] | ["move", forward, left, _] as parts:
-            return "move", [parts[1:]]          # a vector in the robot's frame
-        case ["turn", angle]:
-            return "turn", [angle]
-        case ["stop"]:
-            return "stop", []
-        case ["reset" | "home" | "place" | "teleport" | "goto"]:
-            return "reset", []
-        case ["reset" | "home" | "place" | "teleport" | "goto", x, y]:
-            return "reset", [x, y]
-        case ["reset" | "home" | "place" | "teleport" | "goto", x, y, heading]:
-            return "reset", [x, y, heading]
-        case ["grasp"] | ["grab"] | ["close"]:
-            return "grasp", []
-        case ["release"] | ["open"]:
-            return "release", []
-        case ["look"]:
-            return "look", []
-        case ["telemetry"] | ["battery"]:
-            return "telemetry", []
-        case ["interfaces"]:
-            return "interfaces", []
-        case ["join", channel]:
-            return "join", [channel]
-        case _:
-            return None, f'unknown command "{text}": try {COMMANDS}'
 
 
 _ACTION_PATTERN = re.compile(r"^\((say|command)\s+(.*)\)\s*$")

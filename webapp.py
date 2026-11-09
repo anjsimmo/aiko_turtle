@@ -1,5 +1,5 @@
 # The web application (FastAPI): the robots-and-chat page, a REST API for
-# creating and driving robots, and one SSE stream of poses and chat.
+# creating and driving robots, and one live stream of poses and chat.
 #
 # No Aiko here: create_app(backend) takes any object with the Backend
 # methods below.  web.py provides the Aiko-connected backend; the tests a
@@ -16,7 +16,7 @@ from typing import List, Optional, Union
 from fastapi import (
     Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect,
 )
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -42,12 +42,14 @@ class Backend:
 
     def status(self): ...                       # {"world": bool, "chat": str|None}
     def list_robots(self): ...                  # [robot, ...]
-    def create_robot(self, name, kind, owner, x=0.0, y=0.0, heading=0.0): ...
+    def create_robot(self, name, kind, owner, x=0.0, y=0.0, heading=0.0,
+                     interface=None): ...
     def destroy_robot(self, name): ...
     def move(self, name, distance, username): ...
     def turn(self, name, angle, username): ...
     def reset(self, name, username, x=0.0, y=0.0, heading=0.0): ...
     def pose(self, name): ...
+    def robot_info(self, name): ...             # pose + interface spec + topic paths
     def history(self, name, limit): ...         # [event, ...]
     def command(self, name, chat_command, username): ...  # any chat command
     def send_chat(self, username, message, channel=None): ...
@@ -61,8 +63,8 @@ class Backend:
 
 
 class EventHub:
-    """Fan-out of robot poses, chat messages and status to the page's SSE
-    clients, with replay of recent history for a newly connected page"""
+    """Fan-out of robot poses, chat messages and status to the page's
+    live clients, with replay of recent history for a newly connected page"""
 
     def __init__(self):
         self.clients = set()
@@ -81,7 +83,12 @@ class EventHub:
         event = {"kind": "robot", "name": robot["name"], "x": robot["x"],
                  "y": robot["y"], "heading": robot["heading"],
                  "z": robot.get("z", 0.0),
-                 "type": robot.get("kind", kinds.DEFAULT_KIND)}
+                 "type": robot.get("kind", kinds.DEFAULT_KIND),
+                 "interface": robot.get("interface", ""),
+                 "host": robot.get("host", "external"),
+                 "pen": bool(robot.get("pen", 1)),
+                 "moving": bool(robot.get("moving", False)),
+                 "online": bool(robot.get("online", True))}
         with self.lock:
             trail = self.trails.setdefault(robot["name"], [])
             trail.append(event)
@@ -137,7 +144,7 @@ class EventHub:
 
 
 class _AsyncClient:
-    """An EventHub client for the async SSE route: the hub puts events
+    """An EventHub client for the async routes: the hub puts events
     from Aiko's threads, the route awaits them on the event loop"""
 
     def __init__(self, loop):
@@ -161,7 +168,10 @@ class RobotCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64,
         description="letters, digits, '_' and '-'; also the chat mention @@name")
     kind: str = Field(default=kinds.DEFAULT_KIND,
-        description=f"one of {', '.join(kinds.KINDS)} (GET /api/kinds)")
+        description=f"the body: one of {', '.join(kinds.KINDS)} (GET /api/kinds)")
+    interface: Optional[str] = Field(default=None,
+        description="what it speaks: one of the kind's interfaces (GET /api/kinds); "
+                    "default the kind's own. GET /api/interfaces describes each")
     owner: str = Username
     x: float = Field(default=0.0, description="where it starts")
     y: float = 0.0
@@ -190,9 +200,11 @@ class ResetRequest(BaseModel):
 
 class CommandRequest(BaseModel):
     command: str = Field(min_length=1, max_length=200,
-                         description="a chat command without the mention, "
-                                     "e.g. grasp, release, telemetry, "
-                                     "interfaces, look, move 100")
+                         description="a chat command in the robot's own "
+                                     "interface, without the mention: e.g. "
+                                     "move 100 (proposed), move 0.2 (irobot), "
+                                     "action sit (xgo_robot), forward 100 "
+                                     "(turtle_robot); or help")
     username: str = Username
 
 
@@ -214,6 +226,13 @@ class ChannelRequest(BaseModel):
                          pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 
 
+def _wire(argument):
+    """An argument as the wire takes it: a list becomes (a b c)"""
+    if isinstance(argument, (list, tuple)):
+        return "(" + " ".join(str(part) for part in argument) + ")"
+    return str(argument)
+
+
 # -- the app ---------------------------------------------------------------------
 
 _bearer = HTTPBearer(auto_error=False)
@@ -221,24 +240,26 @@ _bearer = HTTPBearer(auto_error=False)
 
 def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
                agent=config.AGENT_BOTNAME, api_token=config.API_TOKEN,
-               api_token_public=config.API_TOKEN_PUBLIC):
+               api_token_public=config.API_TOKEN_PUBLIC, title=config.TITLE):
     """api_token: when non-empty, every request that changes something
     (POST, DELETE) must carry "Authorization: Bearer <api_token>".
     Reads and the pages stay open.  api_token_public: the token is shown
     on the page and in /api/status, pre-filled, so it is a formality"""
 
     app = FastAPI(
-        title="aiko_turtle",
+        title=title,
         description=(
-            "Virtual robots in a shared world, driven over REST here or over "
-            "Aiko Chat (`@@name move 100` in the channel).  Create a robot "
-            "with any name; a longer, unusual name is less likely to clash "
-            "with someone else's.  Live poses and chat: GET /events (SSE).  "
-            "The human guide, with Aiko and REST examples: /guide."
+            "Virtual robots in a shared world, each speaking the interface "
+            "of a real robot (or a proposed one), driven over REST here or "
+            "over Aiko Chat (`@@name move 100` in the channel).  Real robots "
+            "found in the Registrar appear as twins.  Create a robot with any "
+            "name; a longer, unusual name is less likely to clash with "
+            "someone else's.  Live poses and chat: GET /events (SSE).  The "
+            "human guide, with Aiko and REST examples: /guide."
             + ("  **POST and DELETE need a bearer token** (the Authorize "
                "button)" + (f": `{api_token}`." if api_token_public else
                "; ask for it in the chat.") if api_token else "")),
-        version="1.1")
+        version="2.0")
     app.state.backend = backend
 
     def authorized(request: Request,
@@ -253,9 +274,9 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
 
     write = [Depends(authorized)]
 
-    def call(function, *arguments):
+    def call(function, *arguments, **keywords):
         try:
-            return function(*arguments)
+            return function(*arguments, **keywords)
         except BackendError as error:
             raise HTTPException(error.status, error.detail)
 
@@ -270,6 +291,7 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
                     .replace("__USERNAME__", username)
                     .replace("__AGENT__", agent)
                     .replace("__VIEW__", view)
+                    .replace("__TITLE__", title)
                     .replace("__AUTH__", "true" if api_token else "false"))
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -291,6 +313,14 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
     @app.get("/system", response_class=HTMLResponse, include_in_schema=False)
     def system_page():
         return static_page("system.html")
+
+    @app.get("/sprites/{name}.js", include_in_schema=False)
+    def sprite(name: str):
+        """One drawing function per kind: static/sprites/NAME.js"""
+        if not valid_robot_name(name) or not (_STATIC / "sprites" / f"{name}.js").is_file():
+            raise HTTPException(404, "no such sprite")
+        return FileResponse(_STATIC / "sprites" / f"{name}.js",
+                            media_type="application/javascript")
 
     def sse(request, client, replay, cleanup):
         # Async on purpose: Starlette cancels an async generator the moment
@@ -354,7 +384,7 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
     @app.get("/api/status", tags=["world"])
     def status():
         status = dict(call(backend.status), auth=bool(api_token),
-                      channel=channel, agent=agent,
+                      channel=channel, agent=agent, title=title,
                       streams=len(backend.hub.clients))
         if api_token and api_token_public:
             status["token"] = api_token
@@ -362,8 +392,25 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
 
     @app.get("/api/kinds", tags=["robots"])
     def list_kinds():
-        """The robot kinds, with the Interfaces and chat commands of each"""
+        """The bodies: sprite, axes, the interfaces each may speak (the
+        first is its own) and the chat commands of that interface"""
         return kinds.describe()
+
+    @app.get("/api/interfaces", tags=["robots"])
+    def list_interfaces():
+        """Every interface: the functions a robot of it accepts on its
+        "in" topic, exactly as the real robot does (status real), as an
+        older one did (legacy) or as a design proposes (proposed)"""
+        return kinds.describe_interfaces()
+
+    @app.get("/api/interfaces/{name}", tags=["robots"])
+    def get_interface(name: str, kind: Optional[str] = None):
+        """One interface's spec; with ?kind= only the methods that body has"""
+        if name not in kinds.INTERFACES:
+            raise HTTPException(404, f"unknown interface {name}")
+        if kind is not None and kind not in kinds.KINDS:
+            raise HTTPException(404, f"unknown kind {kind}")
+        return kinds.describe_interface(name, kind)
 
     @app.get("/api/system", tags=["system"])
     def system():
@@ -381,22 +428,41 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
 
     @app.post("/api/mqtt", tags=["mqtt"], status_code=202, dependencies=write)
     def mqtt_publish(body: MqttPublish):
-        """Publish one message.  Example: a robot's <Move> is
-        {"topic": "<its topic_path>/in", "payload": "(move 100 @me)"}"""
+        """Publish one message.  Example: a robot's move is
+        {"topic": "<its topic_path>/in", "payload": "(move 100)"}"""
         call(backend.mqtt_publish, body.topic, body.payload)
         return {"published": True, "topic": body.topic}
 
     @app.get("/api/mqtt/events", tags=["mqtt"], dependencies=write)
     async def mqtt_events(request: Request, topic: str):
         """The same as a stream of server-sent events, until you hang up:
-        curl -N '.../api/mqtt/events?topic=aiko/%23&token=...'"""
+        curl -N '.../api/mqtt/events?topic=aiko/%23&token=...'
+        Up to four topics, comma separated, share one stream"""
+        topics = [part.strip() for part in topic.split(",") if part.strip()][:4]
+        if not topics:
+            raise HTTPException(422, "topic required")
         client = _AsyncClient(asyncio.get_running_loop())
-        call(backend.mqtt_subscribe, topic, client)
-        return sse(request, client, [],
-                   lambda: backend.mqtt_unsubscribe(topic, client))
+        subscribed = []
+        try:
+            for one in topics:
+                call(backend.mqtt_subscribe, one, client)
+                subscribed.append(one)
+        except HTTPException:
+            for one in subscribed:
+                backend.mqtt_unsubscribe(one, client)
+            raise
+
+        def cleanup():
+            for one in subscribed:
+                backend.mqtt_unsubscribe(one, client)
+
+        return sse(request, client, [], cleanup)
 
     @app.get("/api/robots", tags=["robots"])
     def list_robots():
+        """Every robot: pose, kind, interface, host (web: hosted here,
+        external: someone's own process, twin: a real robot's replica),
+        online (false: a twin whose real robot is away), topic_path"""
         return call(backend.list_robots)
 
     @app.post("/api/robots", tags=["robots"], status_code=201,
@@ -406,38 +472,77 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
         if robot.kind not in kinds.KINDS:
             raise HTTPException(422,
                 f"kind must be one of {', '.join(kinds.KINDS)}")
+        if robot.interface and robot.interface not in kinds.kind_interfaces(robot.kind):
+            raise HTTPException(422, f"a {robot.kind} speaks one of "
+                                f"{', '.join(kinds.kind_interfaces(robot.kind))}")
         return call(backend.create_robot, robot.name, robot.kind, robot.owner,
-                    robot.x, robot.y, robot.heading)
+                    robot.x, robot.y, robot.heading, interface=robot.interface)
 
     @app.get("/api/robots/{name}", tags=["robots"])
     def get_robot(name: str):
         check_name(name)
         return call(backend.pose, name)
 
+    @app.get("/api/robots/{name}/interface", tags=["robots"])
+    def robot_interface(name: str):
+        """The robot with the spec of the interface it speaks (methods,
+        example commands, protocol) and its topic path on the bus, for
+        calling it over Aiko or raw MQTT"""
+        check_name(name)
+        return call(backend.robot_info, name)
+
+    @app.get("/api/robots/{name}/wire", tags=["robots"])
+    def robot_wire(name: str, command: str):
+        """What a chat command becomes on the wire, without sending it:
+        the remote function call (method, arguments), the S-expression
+        payload and the topic it goes to, plus the Python that would do
+        it over Aiko.  The page's aiko and mqtt layers use this"""
+        check_name(name)
+        info = call(backend.robot_info, name)
+        interface = info.get("interface") or kinds.default_interface(info["kind"])
+        module = kinds.INTERFACES[interface]
+        method, arguments = module.parse_command(command.strip())
+        if method is None:
+            raise HTTPException(422, arguments)
+        wire = [_wire(argument) for argument in arguments]
+        payload = "(" + " ".join([method, *wire]) + ")"
+        topic_path = info.get("real_topic_path") or info.get("topic_path")
+        python = (f"robot = aiko.ServiceFilter(\"*\", \"{name}\", \"*\", \"*\", \"*\", \"*\")  "
+                  f"# then do_discovery(...), and on the proxy:\n"
+                  f"robot.{method}({', '.join(repr(a) for a in arguments)})")
+        return {"name": name, "interface": interface, "method": method,
+                "arguments": arguments, "payload": payload,
+                "topic": f"{topic_path}/in" if topic_path else None,
+                "twin": info.get("host") == "twin", "python": python}
+
     @app.delete("/api/robots/{name}", tags=["robots"], dependencies=write)
     def destroy_robot(name: str):
         check_name(name)
         return call(backend.destroy_robot, name)
 
-    @app.post("/api/robots/{name}/move", tags=["drive"], dependencies=write)
+    @app.post("/api/robots/{name}/move", tags=["sandbox"], dependencies=write)
     def move(name: str, body: MoveRequest):
-        """distance 100 = forward; [100, 0, 30] = forward and up (a drone);
-        [0, 50] = sideways (an omni base).  Errors if the kind lacks the axis"""
+        """The sandbox's hand, not the robot's interface: move the body
+        in world units whatever it speaks.  distance 100 = forward;
+        [100, 0, 30] = forward and up (a drone); [0, 50] = sideways (an
+        omni base).  Errors if the kind lacks the axis.  To drive a
+        robot in its own words use /command"""
         check_name(name)
         if isinstance(body.distance, list) and not 1 <= len(body.distance) <= 3:
             raise HTTPException(422, "distance: a number or 1 to 3 numbers")
         return call(backend.move, name, body.distance, body.username)
 
-    @app.post("/api/robots/{name}/turn", tags=["drive"], dependencies=write)
+    @app.post("/api/robots/{name}/turn", tags=["sandbox"], dependencies=write)
     def turn(name: str, body: TurnRequest):
+        """The sandbox's hand: turn the body, degrees counter-clockwise"""
         check_name(name)
         return call(backend.turn, name, body.angle, body.username)
 
-    @app.post("/api/robots/{name}/reset", tags=["drive"], dependencies=write)
+    @app.post("/api/robots/{name}/reset", tags=["sandbox"], dependencies=write)
     def reset(name: str, body: Optional[ResetRequest] = None):
         """Put the robot at x, y facing heading (default: the origin),
-        on the ground.  Every kind, even one that cannot move itself
-        (the page does this when you drag a robot)"""
+        on the ground, still.  Every kind, even one that cannot move
+        itself (the page does this when you drag a robot)"""
         check_name(name)
         body = body or ResetRequest()
         return call(backend.reset, name, body.username, body.x, body.y,
@@ -445,10 +550,12 @@ def create_app(backend, channel=config.CHANNEL, username=config.WEB_USERNAME,
 
     @app.post("/api/robots/{name}/command", tags=["drive"], dependencies=write)
     def command(name: str, body: CommandRequest):
-        """Any chat command, without the @@mention: grasp, release,
-        telemetry, interfaces, stop, look, and also move/turn/reset.
-        The robot's reply comes back here as well as in the chat, and a
-        command its kind lacks is a 422 with the robot's explanation"""
+        """A command in the robot's OWN interface, without the @@mention,
+        exactly as the chat takes it: move 100 (proposed), move 0.2
+        (irobot), action sit (xgo_robot), forward 100 (turtle_robot);
+        "help" lists them.  A twin forwards it to the real robot.  The
+        reply comes back here as well as in the chat; a command the
+        interface lacks is a 422 with the robot's explanation"""
         check_name(name)
         return call(backend.command, name, body.command.strip(), body.username)
 

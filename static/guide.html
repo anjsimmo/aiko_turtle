@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Turtle World: guide</title>
+<html><head><meta charset="utf-8"><title>__TITLE__: guide</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -37,7 +37,7 @@ a { color:var(--accent); }
 #kinds td:first-child { white-space:nowrap; }
 </style></head><body>
 <header>
-  <h1>Turtle World <span class="sub">guide</span></h1>
+  <h1>__TITLE__ <span class="sub">guide</span></h1>
   <nav>
     <a href="/">home</a><a href="/world">world</a><a href="/chat">chat</a><a href="/guide" class="here">guide</a><a href="/system">system</a><a href="/docs">API</a><a href="https://github.com/anjsimmo/aiko_turtle" title="source code">github</a>
     <button id="lock" type="button" title="API token" aria-expanded="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> token</button>
@@ -45,37 +45,54 @@ a { color:var(--accent); }
 </header>
 <div id="tokenbar"><label for="token">API token</label><input id="token" type="text" spellcheck="false" placeholder="paste the token"><span id="tokennote">sent as <code>Authorization: Bearer …</code> with every create, drive, chat and MQTT call; the same header works for curl and scripts</span></div>
 <main>
-<p>A shared world of virtual robots for the AI+ML+Robots community: anyone can create a robot, drive it, and watch everyone else's. It runs on <a href="https://github.com/geekscape/aiko_services">Aiko Services</a>, a framework for distributed robots and agents, and the point of the turtles is to learn Aiko by playing. Pick the door that fits you:</p>
+<p>A shared world of virtual robots for the AI+ML+Robots community, and a sandbox for the real ones. Anyone can create a robot that speaks a real robot's interface (the iRobot's, the XGO dog's, the LoliBot's, the tutorial turtle's), drive it, and watch everyone else's. Code you write against a virtual robot works, unchanged, on the real one, because both are Aiko Services with the same functions on the same topics. It runs on <a href="https://github.com/geekscape/aiko_services">Aiko Services</a>, a framework for distributed robots and agents, and the point of playing here is to learn Aiko. Pick the door that fits you:</p>
 <ul class="toc">
   <li><a href="#humans">1. Humans: the page and the chat</a></li>
-  <li><a href="#aiko">2. Python with Aiko (the real thing)</a></li>
-  <li><a href="#rest">3. REST, no Python needed</a></li>
-  <li><a href="#agents">4. Agents and LLMs, MCP</a></li>
-  <li><a href="#kinds">5. The robot kinds</a></li>
-  <li><a href="#join">6. Real robots, contributing, the meetup</a></li>
+  <li><a href="#layers">2. The three layers: chat, Aiko, MQTT</a></li>
+  <li><a href="#aiko">3. Python with Aiko (the real thing)</a></li>
+  <li><a href="#rest">4. REST, no Python needed</a></li>
+  <li><a href="#agents">5. Agents and LLMs, MCP</a></li>
+  <li><a href="#interfaces">6. Interfaces and kinds</a></li>
+  <li><a href="#real">7. Real robots: twins, and swapping the virtual one out</a></li>
+  <li><a href="#adding">8. Adding a robot</a></li>
+  <li><a href="#join">9. Contributing, the meetup</a></li>
 </ul>
 
 <h2 id="humans">1. Humans: the page and the chat</h2>
-<p>Open the <a href="/">home page</a>. The world is on the left, the chat on the right. Type a robot name, pick a kind, press <em>create robot</em>. Click a robot to select it; the buttons under the chat send it commands. Scroll on the map to zoom, drag the ground to pan, drag a robot to put it somewhere else; robots outside the view show as arrows on the edge, and <em>fit all</em> brings everyone back. Everything you do, everyone sees. <a href="/world">/world</a> is the map alone, <a href="/chat">/chat</a> the chat alone (good for a second screen or a phone).</p>
+<p>Open the <a href="/">home page</a>. The world is on the left, the chat on the right. Type a robot name, pick a kind, press <em>create robot</em>; <em>advanced</em> lets you choose which interface it speaks (a turtle speaks the sandbox's proposed interface or the June-2026 tutorial's <code>turtle_robot</code>; an XGO speaks the real dog's <code>xgo_robot</code>). Click a robot to select it; the buttons under the chat send it the commands its interface takes, and the box under the map shows that interface: every function, what it means, and the robot's topic path on the bus. Scroll on the map to zoom, drag the ground to pan, drag a robot to put it somewhere else; robots outside the view show as arrows on the edge, and <em>fit all</em> brings everyone back. Everything you do, everyone sees. <a href="/world">/world</a> is the map alone, <a href="/chat">/chat</a> the chat alone (good for a second screen or a phone).</p>
 <p>Three conventions make the chat work for people and machines at once:</p>
 <ul>
   <li><span class="who">@name</span> Humans are <code>@name</code>. The page adds the <code>@</code> for you.</li>
   <li><span class="who bot">@@name</span> Bots, robots and agents are <code>@@name</code>. A robot acts only on a message that <em>starts</em> with its <code>@@name</code>; talking <em>about</em> a robot does nothing to it.</li>
   <li>Bot replies end with <code>!!!!</code> (you do not see it) so bots never answer bots.</li>
 </ul>
-<pre>@@my_turtle move 100        ;; forward 100 units (negative = backwards)
+<pre>@@my_turtle move 100        ;; forward 100 units (negative = backwards)   [proposed interface]
 @@my_turtle turn 90         ;; degrees counter-clockwise
 @@my_turtle look            ;; where am I
 @@my_turtle grasp           ;; kinds with an arm (LeKiwi, SO-101)
 @@my_turtle telemetry       ;; battery and temperature
-@@my_turtle interfaces      ;; what this kind can do
-@@my_turtle reset           ;; back to the origin (or "reset X Y [H]" to put it anywhere)
-@@my_pi reset 100 -50      ;; put it there (any kind; or drag it on the map); plain "reset" = the origin
-@@my_drone move 100 0 30   ;; a vector: forward, left, up (as many axes as the kind has)
-__AGENT__ move my_turtle in a star shape     ;; the LLM agent, in plain words</pre>
+@@my_dog move x 100         ;; an XGO: walk forward, 100 mm steps, until "stop"   [xgo_robot, the real dog's words]
+@@my_dog action sit         ;; an XGO action from its table (stand, wiggle_tail, ...)
+@@my_create move 1          ;; an iRobot Create 3: one METRE forward                [irobot, the real robot's words]
+@@my_create battery         ;; its battery query
+@@old_turtle forward 100    ;; the June-2026 tutorial turtle                        [turtle_robot]
+@@my_turtle help            ;; every robot: what it takes, whatever interface
+@@my_turtle place 100 -50   ;; every robot: put it there (or drag it on the map); plain "place" = the origin
+@@my_turtle join lab        ;; every robot: move to another channel
+__AGENT__ move my_turtle in a star shape     ;; the LLM agent, in plain words, whatever the robot speaks</pre>
+<p>Units are the robot's own: the sandbox's world is in centimetres (100 units = 1 m), so an iRobot's <code>move 1</code> is 100 units and an XGO's 100 mm stride is 10.</p>
 <p>The channel is <code>#__CHANNEL__</code> by default. The dropdown in the chat header lists the channels the ChatServer knows and lets you switch or create one (type a new name under <em>other</em>). Robots listen in <code>#__CHANNEL__</code>; tell one <code>@@name join lab</code> to move it. The same chat is open from a terminal with Aiko installed (next section): <code>aiko_chat repl</code>, then <code>:cc __CHANNEL__</code>.</p>
 
-<h2 id="aiko">2. Python with Aiko: the real thing</h2>
+<h2 id="layers">2. The three layers: chat, Aiko, MQTT</h2>
+<p>Everything on the page goes down the same stack, and the page lets you send at any level of it. Under the chat box, <em>send as</em> picks the layer; the <em>on the wire</em> log under it shows the selected robot's MQTT topics live, so you see each layer become the next.</p>
+<table><thead><tr><th>layer</th><th>what you send</th><th>what happens</th></tr></thead><tbody>
+<tr><td><strong>chat</strong></td><td><code>@@my_dog move x 100</code> in <code>#__CHANNEL__</code></td><td>the ChatServer relays it on the channel's topic; the robot's ChatBot reads it, parses the words with its interface module, and calls the function on itself. People and LLM agents live here.</td></tr>
+<tr><td><strong>aiko</strong></td><td><code>move x 100</code>, the command without the mention</td><td>a remote function call on the robot's Actor: the page shows the S-expression <code>(move x 100)</code> and the Python that makes the same call through a ServiceFilter, and publishes it to the Actor's <code>in</code> topic. Your own Python does exactly this.</td></tr>
+<tr><td><strong>mqtt</strong></td><td>a topic and a payload, <code>aiko/HOST/PID/SID/in</code> and <code>(move x 100)</code></td><td>the raw MQTT message, which is all Aiko ever sends. Any Service on the broker can be called this way from any language; <a href="/system">/system</a> lists them.</td></tr>
+</tbody></table>
+<p>A twin of a real robot (section 7) forwards the aiko and mqtt layers straight to the real robot's own topic, so the log then shows the real robot's <code>in</code> and <code>out</code> as well.</p>
+
+<h2 id="aiko">3. Python with Aiko: the real thing</h2>
 <p>This is the way we hope you go. The web page and the REST API only drive robots and relay chat; with Aiko you get what everything here is built from: the Registrar that lists every Service, discovery by what a Service <em>can do</em>, direct function calls to any robot, your own robots and agents that the rest of the world sees, and any channel.</p>
 <h3>Install (once, any Python 3.12+)</h3>
 <pre>git clone https://github.com/geekscape/aiko_services &amp;&amp; pip install -e aiko_services
@@ -89,7 +106,8 @@ aiko_chat repl                   # the chat from a terminal (then  :cc __CHANNEL
 aiko_chat send __CHANNEL__ "@@my_turtle move 100"</pre>
 <h3>Run a robot of your own</h3>
 <pre>cd aiko_turtle
-./robot.py run --name my_turtle --kind turtle      # or xgo, lekiwi, drone, ...</pre>
+./robot.py run --name my_turtle --kind turtle                      # or xgo, lekiwi, drone, ...
+./robot.py run --name my_dog --kind xgo --interface xgo_robot      # speaking the real dog's interface</pre>
 <p>While that runs, <em>your</em> process is the robot: it registers as a Service, answers in the chat, and the web server steps back. Stop it and the web server speaks for the robot again. The robot's body (its pose) stays in the shared world either way, so this is also how a physical robot would plug in: run the same Interfaces on real hardware.</p>
 <h3>Drive one from code</h3>
 <p><code>examples/aiko_drive.py</code> finds a robot in the Registrar and calls its <code>&lt;Move&gt;</code> functions directly; <code>examples/agent_bot.py</code> is a 60-line chat agent that discovers robots by their tags and drives them. The notebook <code>examples/colab_turtle.ipynb</code> does the REST and the Aiko path step by step in Google Colab.</p>
@@ -122,15 +140,15 @@ aiko.compose_instance(SquareBot, aiko.actor_args("square_bot",
 aiko.process.run()</pre>
 <p>The full version with the Registrar lookup is <code>examples/agent_bot.py</code>; <code>agent.py</code> is the same with an LLM deciding the commands.</p>
 <h3>How a robot is described</h3>
-<p>Every robot registers with one tag per Interface it implements, following Aiko's aspect-tag convention, plus a few for the chat and the agent:</p>
-<pre>chat=0 robot=0 move=0 perceive=0 telemetry=0 botname=@@my_turtle channel=__CHANNEL__ kind=turtle world=turtle_world commands=move,turn,...</pre>
-<p>So a client asks the Registrar for <code>tags=["move=0"]</code> and gets every robot that can move, whatever it is. A kind with no <code>&lt;Move&gt;</code> (a Raspberry Pi) simply does not match. The Interfaces are in <code>interfaces.py</code>: <code>&lt;Chat&gt;</code>, <code>&lt;Robot&gt;</code>, <code>&lt;Move&gt;</code>, <code>&lt;Grasp&gt;</code>, <code>&lt;Perceive&gt;</code>, <code>&lt;Telemetry&gt;</code>.</p>
+<p>Every virtual robot registers with the Registrar under its name, with one aspect tag per Interface it implements (the Aiko convention, one property per tag, no spaces), plus what the chat, the agent and the sandbox need:</p>
+<pre>ec=true sandbox=virtual type=chat_robot chat=0 robot=0 interface=proposed botname=@@my_turtle channel=__CHANNEL__ kind=turtle world=turtle_world commands=move,turn,stop,snapshot,get_telemetry move=0 perceive=0 telemetry=0 axes=1</pre>
+<p>So a client asks the Registrar for <code>tags=["move=0"]</code> and gets every robot that can move, whatever it is; <code>tags=["interface=xgo_robot"]</code> gets every virtual dog; <code>tags=["sandbox=twin"]</code> gets the twins of real robots. A robot speaking a real robot's interface registers with that robot's <em>protocol</em> too (an XGO's <code>…/xgo_robot:0</code>), so a ServiceFilter on the protocol finds the virtual and the real one alike. The proposed Interfaces are in <code>interfaces.py</code>: <code>&lt;Chat&gt;</code>, <code>&lt;Robot&gt;</code>, <code>&lt;Move&gt;</code>, <code>&lt;Grasp&gt;</code>, <code>&lt;Perceive&gt;</code>, <code>&lt;Telemetry&gt;</code>; the real robots' are in <code>robots/</code>, one module each.</p>
 
-<h2 id="rest">3. REST, no Python needed</h2>
+<h2 id="rest">4. REST, no Python needed</h2>
 <p>Everything a human can do on the page, over HTTP. The interactive reference is <a href="/docs">/docs</a>. A longer, unusual robot name is less likely to clash with someone else's.</p>
 <pre>TOKEN=__TOKEN__   # this instance's token; see the lock at the top of the page
 curl -X POST __BASE__/api/robots -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-     -d '{"name": "my_turtle", "kind": "turtle", "owner": "@me"}'
+     -d '{"name": "my_turtle", "kind": "turtle", "owner": "@me"}'          # add "interface": "turtle_robot" for the tutorial's words
 curl -X POST __BASE__/api/robots/my_turtle/turn -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
      -d '{"angle": 90, "username": "@me"}'
 curl -X POST __BASE__/api/robots/my_turtle/move -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
@@ -140,7 +158,10 @@ curl -X POST __BASE__/api/robots/NAME/reset -H "Authorization: Bearer $TOKEN" -H
 curl -X POST __BASE__/api/robots/NAME/move -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
      -d '{"distance": [100, 0, 30], "username": "@me"}'           # a vector: forward, left, up (drones have 3 axes, omni bases 2)
 curl __BASE__/api/robots                 # everyone's robots
-curl __BASE__/api/kinds                  # what each kind can do
+curl __BASE__/api/kinds                  # what each kind can do and which interfaces it may speak
+curl __BASE__/api/interfaces             # every interface: real, legacy or proposed, its functions
+curl __BASE__/api/robots/my_turtle/interface                     # the spec it speaks and its topic path
+curl "__BASE__/api/robots/my_turtle/wire?command=move%20100"     # what a chat command becomes on the wire
 curl __BASE__/api/robots/my_turtle/history
 curl -N __BASE__/events                  # live poses and chat (server-sent events)
 curl -X POST __BASE__/api/robots/NAME/command -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
@@ -151,10 +172,10 @@ curl -X DELETE __BASE__/api/robots/my_turtle -H "Authorization: Bearer $TOKEN"</
 <p>Every drive call returns the new pose. <code>examples/rest_drive.py</code> is the same in 30 lines of standard-library Python.</p>
 <p>Reads are open. Writes carry the token, shown under the lock at the top of every page (and in <code>/docs</code> under Authorize).</p>
 
-<h2 id="agents">4. Agents and LLMs</h2>
+<h2 id="agents">5. Agents and LLMs</h2>
 <p>An agent with Python should use Aiko (section 2): discovery by tags, direct calls, its own Services. <code>examples/agent_bot.py</code> is the template, and <code>agent.py</code> (the <code>__AGENT__</code> you see in the chat) is the same shape with an LLM in the middle and a rate limit. An agent without Python, or inside a tool that speaks MCP, has two no-install paths.</p>
 <h3>MCP</h3>
-<p><code>mcp_server.py</code> exposes the robots as tools over the Model Context Protocol (stdio): <code>list_robots</code>, <code>list_kinds</code>, <code>create_robot</code>, <code>move</code>, <code>turn</code>, <code>reset</code>, <code>command</code> (grasp, release, telemetry, ...), <code>history</code>, <code>chat</code>, <code>read_chat</code>, <code>destroy_robot</code>. It is a wrapper over the REST API, so it needs only <code>pip install mcp</code>.</p>
+<p><code>mcp_server.py</code> exposes the robots as tools over the Model Context Protocol (stdio): <code>list_robots</code>, <code>list_kinds</code>, <code>list_interfaces</code>, <code>robot_interface</code>, <code>create_robot</code>, <code>move</code>, <code>turn</code>, <code>reset</code>, <code>command</code> (grasp, release, telemetry, ...), <code>history</code>, <code>chat</code>, <code>read_chat</code>, <code>destroy_robot</code>. It is a wrapper over the REST API, so it needs only <code>pip install mcp</code>.</p>
 <pre># Claude Code
 claude mcp add turtle -e TURTLE_URL=__BASE__ -- python3 /path/to/aiko_turtle/mcp_server.py
 
@@ -172,14 +193,50 @@ curl -X POST __BASE__/api/mqtt -H "Authorization: Bearer $TOKEN" -H 'Content-Typ
 <p>Topics must start with <code>aiko/</code>; a robot's topic path is in the Registrar table on <a href="/system">/system</a>.</p>
 <p>A2A is not wired up yet; the chat channel is the agent-to-agent bus for now, and a pull request is welcome.</p>
 
-<h2 id="kinds">5. The robot kinds</h2>
-<p>Each kind is a sprite on the map and a set of Interfaces, which decide the commands it accepts and the tags it registers with. They are the robots the group actually builds and brings along.</p>
-<table id="kinds"><thead><tr><th>kind</th><th>what it is</th><th>Interfaces</th><th>chat commands</th></tr></thead><tbody></tbody></table>
-<p><code>move</code> takes a vector in the robot's own frame, <code>forward left up</code>, and the kind says how many axes it has: a turtle one, an omni base or a walking dog two, a drone three (its altitude is <code>z</code> in the pose). <code>reset X Y [H]</code> puts any kind anywhere (plain <code>reset</code> is the origin), and so does dragging it on the map.</p>
-<p><strong>Adding a kind</strong> is one entry in <code>kinds.py</code> and one small drawing function in <code>static/index.html</code>; the README has the recipe. Open a pull request, or start your own project on top of this one, we will link it.</p>
+<h2 id="interfaces">6. Interfaces and kinds</h2>
+<p>Two things describe a robot here. Its <strong>kind</strong> is the body: the sprite on the map and how many axes it moves in (a turtle one, an omni base or a walking dog two, a drone three, a bare Raspberry Pi none). Its <strong>interface</strong> is what it speaks: the functions on its <code>in</code> topic, the words its chat takes, the units it thinks in, the protocol it registers with. Each kind lists the interfaces it may speak, the real robot's first.</p>
+<table id="kinds"><thead><tr><th>kind</th><th>what it is</th><th>interfaces it may speak</th><th>chat commands (default interface)</th></tr></thead><tbody></tbody></table>
+<p>The interfaces come in three statuses, and the status is shown next to each:</p>
+<ul>
+  <li><strong>real</strong>: a physical robot's interface <em>as it is today</em>, read from its code, not changed to match ours. <code>irobot</code> (the Create 3 under aiko_irobot on Zebra2, which registers as <code>robot</code>), <code>xgo_robot</code> (the XGO dog's Actor in aiko_chat). The virtual robot accepts exactly those functions, with those units, and refuses the ones that would switch a real robot off (power off, terminate) in the chat.</li>
+  <li><strong>legacy</strong>: an interface older code still speaks. <code>turtle_robot</code> is the June-2026 tutorial notebooks' turtle (<code>forward</code>, <code>left</code>, <code>right</code>, <code>backward</code>, <code>action</code>), so those notebooks drive a sandbox turtle unchanged.</li>
+  <li><strong>proposed</strong>: what we would like robots to speak, the sandbox's <code>&lt;Move&gt;</code>/<code>&lt;Grasp&gt;</code>/<code>&lt;Perceive&gt;</code>/<code>&lt;Telemetry&gt;</code> Interfaces, and <code>lolibot</code>, the words the updated LoliBot firmware in <code>lolibot_mp/</code> takes (<code>forward</code>, <code>left</code>, <code>stop</code>, <code>led</code>, with an optional duration).</li>
+</ul>
+<table><thead><tr><th>interface</th><th>status</th><th>protocol</th><th>units</th><th>source</th></tr></thead><tbody id="ifaces"></tbody></table>
+<p>A robot's commands are parsed by its interface module alone, so there is no shared vocabulary to learn beyond the sandbox's own words that every robot takes: <code>help</code>, <code>place X Y [H]</code>, <code>join CHANNEL</code>.</p>
 
-<h2 id="join">6. Real robots, contributing, the meetup</h2>
-<p>The virtual robots exist so that the same Interfaces can run on real ones: an XGO, a LoliBot, a LeKiwi with its arm. If you want to see one, or plug yours in, come to the <a href="https://www.meetup.com/ai-ml-robots/">AI+ML+Robots meetup</a> (<a href="https://ai-ml-robots.github.io/">ai-ml-robots.github.io</a>). The shared services this runs on are the community instance described on <a href="/system">/system</a>.</p>
+<h2 id="real">7. Real robots: twins, and swapping the virtual one out</h2>
+<h3>What happens when a real robot appears</h3>
+<p>The web server watches the Registrar. When a Service shows up that an interface module recognises (by the name or the protocol the real robot registers with, exactly as its code does today), the sandbox creates a <strong>twin</strong> of it: a robot on the map, drawn with a dashed ring, named after the real robot's Registrar name (or <code>name_host</code> if a virtual robot already has that name), speaking the same interface. The twin is a second Aiko Service, tagged <code>sandbox=twin</code> and <code>twin_of=&lt;topic path&gt;</code>, so your discovery code can tell them apart or treat them alike. When the real robot goes away the twin stays, dimmed and marked offline, and comes back to life when the robot does. Remove the twin and it is recreated the next time the robot is seen; untick <em>show real robots (twins)</em> on the home page to hide every twin from the map and the list.</p>
+<h3>Where the twin is drawn: estimating the real robot's position</h3>
+<p>A real robot does not know where it is in our world, so the twin estimates:</p>
+<ol>
+  <li>It starts where you put it: drag it on the map, or <code>@@name place X Y H</code>, to line it up with the room (the sandbox's origin is wherever you decide it is).</li>
+  <li>It watches the real robot's <code>in</code> topic. Every command anyone sends, from here or from their own code, is run through the interface's dead-reckoning rule: an iRobot's <code>(move 1)</code> advances the twin 100 units, an XGO's <code>(move x 100)</code> walks it at 2 strides a second until <code>(stop)</code>, a <code>(turn 90)</code> turns it. The rule is the interface module's <code>observe()</code>, and it is as good as the robot's own motion is: a real robot that slips, stalls or bumps drifts away from its twin.</li>
+  <li>It watches the real robot's <code>out</code> topic. When the robot reports its own pose (the iRobot's <code>(pose x y heading)</code>, in metres), that wins over dead reckoning, and the twin snaps to it (scaled into the world's units, relative to the place you set).</li>
+</ol>
+<p>So the twin's pose is an estimate, honest about being one: good enough to see what your program is telling the robot to do, not a position sensor. The pose box under the map says <em>twin</em> so no one mistakes it for ground truth.</p>
+<h3>Swapping a simulated robot for the real one</h3>
+<p>Nothing in your code changes; what changes is which Service answers. The handover is:</p>
+<ol>
+  <li><strong>Develop against the virtual robot.</strong> Create one that speaks the real robot's interface (<code>xgo_robot</code> for the dog, <code>irobot</code> for the Create), and write your program against it over Aiko: a <code>ServiceFilter</code> on the protocol (or the name), discovery, then the functions. Watch it on the map; read the wire log to see the S-expressions it produces.</li>
+  <li><strong>Bring the real robot onto the broker.</strong> Its own software, unchanged (aiko_irobot, the XGO Actor, the LoliBot firmware), registers with the Registrar. The sandbox makes its twin. Place the twin where the robot is.</li>
+  <li><strong>Point your program at the real one.</strong> The only thing that differs is the Service your filter picks: filter by the real robot's name (<code>robot</code> for the iRobot, the XGO's name), or exclude <code>sandbox=virtual</code> from the tags. Nothing else changes, because the virtual robot accepted exactly the real one's functions and units.</li>
+  <li><strong>Drive from here as well, if you like.</strong> Chat to the twin (<code>@@robot move 1</code>) or send the aiko/mqtt layers to it: the twin forwards the call to the real robot's <code>in</code> topic, and for a few seconds relays what comes back on its <code>out</code> into the chat. Power-off and terminate are refused in the chat; send those from your own code, on purpose. E-stop is honoured, on the virtual robot and forwarded to the real one.</li>
+  <li><strong>Retire the virtual one</strong> (or keep it: a virtual and a real dog can live side by side under different names, and the twin can be hidden).</li>
+</ol>
+<p class="note">The real robots' interfaces are the ones their code has <em>now</em>. The constitution's gates, deny-by-default and aspect tags are the direction; for an older robot, simpler is better, and the sandbox meets each robot where it is.</p>
+
+<h2 id="adding">8. Adding a robot</h2>
+<p>A robot is one module in <code>robots/</code> and, if its body is new, one sprite in <code>static/sprites/</code>. The module says what the robot speaks, how to parse its chat, how to recognise the real one in the Registrar, how a command moves the twin, and how a virtual one behaves. <code>robots/_template.py</code> is the shape, the real modules are the examples, and the contract is at the top of <code>robots/__init__.py</code>. Drop the file in and the kind appears on the page, in <code>/api/interfaces</code>, in the agent's prompt and in the MCP tools without touching anything else.</p>
+<pre>robots/mybot.py              # NAME, STATUS, PROTOCOL, MATCH, KINDS, COMMANDS, parse_command, Interface, Simulated, observe
+static/sprites/mybot.js      # SPRITES.mybot = function (c, col) { ... }   top-down, nose along +x, ~40 px</pre>
+<p>For a robot whose interface you only have as code (its Actor, its client library, a firmware file) or as something you watched on the bus, <code>tools/infer_interface.py</code> drafts the module with the LLM: point it at the code, or let it watch the robot's topics for a while, and it writes <code>robots/NAME.py</code> for you to read, correct and keep. In Claude Code the <code>/add-robot</code> skill walks through the same steps.</p>
+<pre>python3 tools/infer_interface.py mybot --code ../mybot/robot.py --write
+python3 tools/infer_interface.py mybot --watch aiko/+/+/+ --seconds 60 --write</pre>
+
+<h2 id="join">9. Contributing, the meetup</h2>
+<p>If you want to see a real robot, or plug yours in, come to the <a href="https://www.meetup.com/ai-ml-robots/">AI+ML+Robots meetup</a> (<a href="https://ai-ml-robots.github.io/">ai-ml-robots.github.io</a>). The shared services this runs on are the community instance described on <a href="/system">/system</a>.</p>
 <p>The code is at <a href="https://github.com/anjsimmo/aiko_turtle">github.com/anjsimmo/aiko_turtle</a>. Issues, ideas and pull requests from beginners are as welcome as from the experts. The README says how it is put together and where to start.</p>
 </main>
 <script>
@@ -219,7 +276,17 @@ fetch("/api/kinds").then(function (r) { return r.json(); }).then(function (list)
   var tb = document.querySelector("#kinds tbody");
   list.forEach(function (k) {
     var tr = document.createElement("tr");
-    [k.label + " (" + k.name + ")", k.description, "<" + k.interfaces.join("> <") + ">", k.commands.join(", ")].forEach(function (t) {
+    [k.label + " (" + k.name + ")", k.description + " (" + k.axes + " axes)", k.interfaces.join(", "), k.commands.join(", ")].forEach(function (t) {
+      var td = document.createElement("td"); td.textContent = t; tr.append(td);
+    });
+    tb.append(tr);
+  });
+});
+fetch("/api/interfaces").then(function (r) { return r.json(); }).then(function (list) {
+  var tb = document.getElementById("ifaces");
+  list.forEach(function (i) {
+    var tr = document.createElement("tr");
+    [i.name, i.status, i.protocol || "(none: matched by name " + JSON.stringify(i.match || {}) + ")", i.units || "", i.source || ""].forEach(function (t) {
       var td = document.createElement("td"); td.textContent = t; tr.append(td);
     });
     tb.append(tr);

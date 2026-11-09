@@ -1,20 +1,4 @@
-from core import RateLimiter, parse_actions, parse_command, valid_robot_name
-
-
-def test_parse_command():
-    assert parse_command("move 100") == ("move", ["100"])
-    assert parse_command("turn -90") == ("turn", ["-90"])
-    assert parse_command("home") == ("reset", [])
-    assert parse_command("battery") == ("telemetry", [])
-    assert parse_command("join lab") == ("join", ["lab"])
-    assert parse_command("grab") == ("grasp", [])
-    assert parse_command("reset 10 -20") == ("reset", ["10", "-20"])
-    assert parse_command("place 1 2 90") == ("reset", ["1", "2", "90"])
-    assert parse_command("move 100 0 30") == ("move", [["100", "0", "30"]])
-    assert parse_command("move 0 50") == ("move", [["0", "50"]])
-    method, error = parse_command("move 1 2 3 4")
-    assert method is None and "unknown command" in error
-    assert parse_command("")[0] is None
+from core import RateLimiter, parse_actions, valid_robot_name
 
 
 def test_parse_actions():
@@ -50,10 +34,11 @@ def test_valid_robot_name():
 
 
 def test_kinds():
-    from kinds import KINDS, kind_commands, supports
-    assert set(KINDS) >= {"turtle", "lolibot", "xgo", "lekiwi", "so101", "drone", "pi"}
+    from kinds import KINDS, kind_axes, kind_commands, kind_interfaces, supports
+    assert set(KINDS) >= {"turtle", "lolibot", "xgo", "irobot", "lekiwi", "so101", "drone", "pi"}
     assert supports("turtle", "move") and not supports("pi", "move")
     assert supports("so101", "grasp") and not supports("turtle", "grasp")
-    from kinds import kind_axes
     assert (kind_axes("turtle"), kind_axes("lekiwi"), kind_axes("drone"), kind_axes("pi")) == (1, 2, 3, 0)
-    assert kind_commands("pi") == ["look", "telemetry", "interfaces", "join", "reset"]
+    assert kind_commands("pi") == ["look", "telemetry"]        # no <Move>
+    assert kind_interfaces("turtle") == ["proposed", "turtle_robot"]
+    assert kind_interfaces("xgo")[0] == "xgo_robot"             # the real one first

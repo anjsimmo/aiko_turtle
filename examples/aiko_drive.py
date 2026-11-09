@@ -21,7 +21,10 @@ import aiko_services as aiko
 
 NAME = sys.argv[1] if len(sys.argv) > 1 else "my_turtle"
 ME = "@aiko_drive"
-ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"
+ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"   # the "proposed" interface; a robot
+# speaking a real robot's interface registers with THAT protocol instead, e.g.
+# "github.com/geekscape/aiko_services/protocol/xgo_robot:0", and takes the real
+# robot's functions (move x 100, turn 50, stop): see /api/interfaces
 
 
 class Move(aiko.Interface):         # the subset of <Move> we call (interfaces.py)

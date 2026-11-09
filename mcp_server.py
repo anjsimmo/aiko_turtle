@@ -31,11 +31,15 @@ AGENT_NAME = os.environ.get("TURTLE_MCP_USERNAME", "@@mcp")
 
 mcp = FastMCP("aiko_turtle",
     instructions=(
-        "Virtual robots in a shared world (aiko_turtle). Robots have a pose "
-        "(x, y, heading in degrees counter-clockwise, 0 = +x). Use list_kinds "
-        "to see what each kind can do, create_robot to add one, move/turn "
-        "to drive it, and chat to talk in the #robots channel where humans "
-        "and other agents are. Say who you are: bots are named @@name."))
+        "Virtual robots in a shared world (the Aiko sandbox), each speaking "
+        "the interface of a real robot. Robots have a pose (x, y, heading in "
+        "degrees counter-clockwise, 0 = +x). Use list_interfaces to see the "
+        "commands of each interface, list_kinds for the bodies, create_robot "
+        "to add one, command to drive it in its own words (move 0.2 for an "
+        "irobot, action sit for an xgo_robot), and chat to talk in the "
+        "#robots channel where humans and other agents are. Twins of real "
+        "robots forward your commands to the real one. Say who you are: "
+        "bots are named @@name."))
 
 
 def call(method, path, body=None):
@@ -69,9 +73,29 @@ def list_kinds() -> list:
 
 
 @mcp.tool()
-def create_robot(name: str, kind: str = "turtle", owner: str = AGENT_NAME) -> dict:
-    """Create a robot (idempotent). name: letters, digits, '_' and '-'"""
-    return call("POST", "/api/robots", {"name": name, "kind": kind, "owner": owner})
+def list_interfaces() -> list:
+    """Every interface a robot may speak: its functions, example commands,
+    units, and whether a real robot speaks it (real), an older one did
+    (legacy) or it is a proposal"""
+    return call("GET", "/api/interfaces")
+
+
+@mcp.tool()
+def create_robot(name: str, kind: str = "turtle", owner: str = AGENT_NAME,
+                 interface: str = "") -> dict:
+    """Create a robot (idempotent). name: letters, digits, '_' and '-';
+    interface: one the kind may speak (list_kinds), default its own"""
+    body = {"name": name, "kind": kind, "owner": owner}
+    if interface:
+        body["interface"] = interface
+    return call("POST", "/api/robots", body)
+
+
+@mcp.tool()
+def robot_interface(name: str) -> dict:
+    """A robot's interface spec (functions, example commands) and its
+    topic path on the MQTT bus"""
+    return call("GET", f"/api/robots/{name}/interface")
 
 
 @mcp.tool()
@@ -82,9 +106,9 @@ def destroy_robot(name: str) -> dict:
 
 @mcp.tool()
 def move(name: str, distance: float | list[float], username: str = AGENT_NAME) -> dict:
-    """Move a robot: a number = forward (negative = backwards), or a vector
-    [forward, left, up] in its own frame for kinds with more axes (a drone
-    has 3, an omni base 2; see list_kinds).  Returns the new pose"""
+    """The sandbox's hand: move the body in world units whatever interface
+    it speaks (a number = forward, or [forward, left, up]).  To drive a
+    robot in its own words use command().  Returns the new pose"""
     return call("POST", f"/api/robots/{name}/move",
                 {"distance": distance, "username": username})
 
@@ -107,9 +131,11 @@ def reset(name: str, x: float = 0, y: float = 0, heading: float = 0,
 
 @mcp.tool()
 def command(name: str, command: str, username: str = AGENT_NAME) -> dict:
-    """Any chat command for a robot, without the @@mention: grasp or
-    release (arms: LeKiwi, SO-101), telemetry, interfaces, stop, look.
-    The reply text comes back; a command the kind lacks is an error"""
+    """A command in the robot's own interface, without the @@mention
+    (see robot_interface or list_interfaces for the words): move 100 for
+    the proposed interface, move 0.2 for an irobot, action sit for an
+    xgo_robot, forward 100 for a legacy turtle; "help" lists them.  The
+    reply text comes back; a command the interface lacks is an error"""
     return call("POST", f"/api/robots/{name}/command",
                 {"command": command, "username": username})
 

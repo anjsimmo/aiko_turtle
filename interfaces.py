@@ -44,16 +44,18 @@ class Move(aiko.Interface):
     aiko.Interface.default("Move", "interfaces.MoveDefault")
 
     @abstractmethod
-    def move(self, distance):       # a number, or a vector (forward left up)
-        pass
+    def move(self, distance):
+        """translate in the robot's frame: a number (forward, world units;
+        negative = backwards) or a vector (forward left up), as many axes
+        as the body has"""
 
     @abstractmethod
     def turn(self, angle):
-        pass
+        """degrees counter-clockwise (negative = clockwise)"""
 
     @abstractmethod
     def stop(self):
-        pass
+        """stop any motion"""
 
 
 class Telemetry(aiko.Interface):
@@ -61,7 +63,7 @@ class Telemetry(aiko.Interface):
 
     @abstractmethod
     def get_telemetry(self, topic_path_response):
-        pass
+        """battery and temperature, replied on topic_path_response"""
 
 
 class Perceive(aiko.Interface):
@@ -69,7 +71,8 @@ class Perceive(aiko.Interface):
 
     @abstractmethod
     def snapshot(self, topic_path_response):
-        pass
+        """what the robot sees: its pose and what is around it, replied on
+        topic_path_response"""
 
 
 class Grasp(aiko.Interface):
@@ -77,11 +80,11 @@ class Grasp(aiko.Interface):
 
     @abstractmethod
     def grasp(self):
-        pass
+        """close the gripper"""
 
     @abstractmethod
     def release(self):
-        pass
+        """open the gripper"""
 
 
 class Robot(aiko.Interface):

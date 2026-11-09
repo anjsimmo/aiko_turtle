@@ -1,26 +1,36 @@
 #!/usr/bin/env python3
 #
-# ChatRobotAgent: one virtual robot, as an Aiko Actor implementing the
-# <Chat> and <Robot> Interfaces (<Robot> composed of <Move>, <Grasp>,
-# <Perceive> and <Telemetry>, as the robot's kind allows: kinds.py).  Its
-# body lives in the VirtualWorld; this Actor is the robot's voice in the
-# chat and its entry in the Registrar.
+# ChatRobotAgent: one robot in the sandbox, as an Aiko Actor.  It speaks
+# ONE interface (robots/NAME.py: the functions on its "in" topic, exactly
+# as the real robot of that interface accepts them) plus <Chat>, so the
+# same robot answers a remote function call, a chat command and the REST
+# API.  Its body lives in the VirtualWorld.
 #
-# Anyone can run one, from anywhere, against the shared services:
+# Two kinds of robot Actor are built here, one class per interface:
+#
+#   virtual  the Simulated implementation of the interface: a call acts on
+#            the body in the world            (host "web" or "external")
+#   twin     the replica of a REAL robot found in the Registrar: a call is
+#            forwarded to the real Actor, and what the real one sends and
+#            receives moves the twin by dead reckoning   (host "twin")
+#
+# Anyone can run a virtual one, from anywhere, against the shared services:
 #
 #   source env.sh
-#   ./robot.py run --name my_turtle [--kind turtle|xgo|...] [--channel robots]
+#   ./robot.py run --name my_turtle [--kind turtle] [--interface proposed]
 #
 # then, in the channel:  @@my_turtle move 100
 #
-# The web server (web.py) hosts a ChatRobotAgent in its own process for
-# every robot created through the REST API, with host_robot().
+# The web server (web.py) hosts one for every robot created over REST and
+# a twin for every real robot it discovers, with host_robot() and
+# host_twin().
 #
-# Chat commands: move D (or move F L [U], a vector in the robot's frame:
-# forward, left, up, as many axes as the kind has), turn A, stop,
-# reset [X Y [H]] (the origin, or anywhere: works for every kind), grasp,
-# release, look, telemetry, interfaces, join CHANNEL (those the kind
-# supports).  Only messages STARTING with "@@name" are commands.
+# Chat: a message STARTING with "@@name" is a command for that robot, in
+# the words of its interface ("help" lists them).  Every robot also takes
+# the sandbox's own words: help, place X Y [H] (put it somewhere), join
+# CHANNEL.
+
+import time
 
 import click
 
@@ -33,33 +43,45 @@ import aiko_chat.bot as bot
 from aiko_chat.protocol import _decode_message
 
 import config
-from core import parse_command
-from interfaces import (
-    Chat, Grasp, Move, Perceive, Robot, Telemetry, aspect_tags,
-)
-from kinds import (
-    DEFAULT_KIND, KINDS, kind_axes, kind_commands, kind_interfaces, supports,
-)
+import robots as registry
+from robots import base
+from interfaces import Chat, Robot
 from virtual_world import VirtualWorld
 
-ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"
+ROBOT_PROTOCOL = "ai.hashtag.ai/chat_robot:0"   # virtual robots with no protocol of their own
+TWIN_PROTOCOL = "ai.hashtag.ai/twin:0"
 ACK_SUFFIX = " !!!!"            # loop-prevention convention, see aiko_chat.bot
+SANDBOX_TAG = "sandbox"         # sandbox=virtual | sandbox=twin: ours, in the Registrar
+RELAY_SECONDS = 15.0            # a twin relays the real robot's "out" this long after a command
+GENERIC = ("help", "interfaces", "commands", "join", "place", "teleport",
+           "reset", "home")
 
 
-class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry):
+class ChatRobotBase(bot.ChatBot, Chat, Robot):
+    """What every robot Actor here has: the chat, the world, the body"""
+
     def __init__(self, context, robot_name, channel=config.CHANNEL,
-                 world_name=config.WORLD_NAME, kind=DEFAULT_KIND,
-                 owner="anonymous", host="external"):
+                 world_name=config.WORLD_NAME, kind=registry.DEFAULT_KIND,
+                 interface=None, owner="anonymous", host="external",
+                 source=""):
         context.call_init(self, "ChatBot", context)
         self.robot_name = robot_name
         self.botname = f"@@{robot_name}"
         self.current_channel = channel
-        self.kind = kind if kind in KINDS else DEFAULT_KIND
-        self.gripper = "open"       # <Grasp> state (virtual: no world needed)
+        self.kind, self.interface = registry.resolve(kind, interface)
+        self.module = registry.INTERFACES[self.interface]
         self.owner = owner
         self.host = host
+        self.source = source
+        self.body = base.Body(self)
+        self.apply_op = self.body.apply
+        self.last_pose = None
+        self.current_username = "anonymous"
+        self.telemetry_timer = None
         self.share["source_file"] = __file__
+        self.share["interface"] = self.interface
         self.world = None
+        self.world_topic = None
         self.world_filter = aiko.ServiceFilter(
             "*", world_name, "*", "*", "*", "*")
         self.world_response_topic = f"{self.topic_path}/world_response"
@@ -95,10 +117,11 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
         self.world = service
         self.world_topic = service_details[0]
         self.world.create_robot(self.robot_name, self.kind, self.owner,
-                                self.host, self.world_response_topic)
+                                self.host, self.world_response_topic,
+                                0.0, 0.0, 0.0, self.interface, self.source or "")
 
     def _world_remove_handler(self, service_details):
-        if service_details[0] != getattr(self, "world_topic", None):
+        if service_details[0] != self.world_topic:
             return                  # another world of the same name, not ours
         self.print("world disconnected")
         self.world = None
@@ -112,67 +135,70 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
         if command != "response" or not fields:
             return
         if fields[0] == "error":
-            text = "error: " + " ".join(str(field) for field in fields[1:])
-        elif fields[0] == "create":
-            text = f"ready at {_pose_words(fields)}"
+            self._say("error: " + " ".join(str(field) for field in fields[1:]))
+            return
+        pose = _pose(fields)
+        if pose:
+            self.last_pose = pose
+        if fields[0] == "create":
+            self._say(f"ready at {_pose_words(fields)}")
+        elif fields[0] in ("pose", "host"):
+            self._say(f"at {_pose_words(fields)}")
+        elif fields[0] == "drive" and pose and pose.get("moving"):
+            self._say(f"moving from {_pose_words(fields)}")
         else:
-            text = f"{fields[0]}: now at {_pose_words(fields)}"
-        self._say(text)
+            self._say(f"{fields[0]}: now at {_pose_words(fields)}")
 
-    def _with_world(self, action):
+    def _world_call(self, method, arguments, with_username=True):
+        """A remote function of the world, replying to our topic"""
         if not self.world:
             return "world not connected, try again shortly"
-        action(self.world)
-        return None             # the world's response is relayed to chat
+        arguments = [_wire(argument) for argument in arguments]
+        if with_username:
+            arguments.append(self.current_username)
+        getattr(self.world, method)(self.robot_name, *arguments,
+                                    self.world_response_topic)
+        return None             # the world's response is relayed to the chat
 
-    # -- <Move> --------------------------------------------------------------
+    # -- for the Simulated implementations -----------------------------------
 
-    def move(self, distance, username="anonymous"):
-        return self._with_world(lambda world: world.apply_move(
-            self.robot_name, distance, username, self.world_response_topic))
-
-    def turn(self, angle, username="anonymous"):
-        return self._with_world(lambda world: world.apply_turn(
-            self.robot_name, angle, username, self.world_response_topic))
-
-    def stop(self):
-        return "stopped (a virtual turtle moves instantly, nothing to stop)"
-
-    def reset(self, x=0, y=0, heading=0, username="anonymous"):
-        """Not part of <Move>: a Pi can be put somewhere too"""
-        return self._with_world(lambda world: world.reset(
-            self.robot_name, x, y, heading, username, self.world_response_topic))
-
-    # -- <Grasp> -------------------------------------------------------------
-
-    def grasp(self):
-        self.gripper = "closed"
-        return "gripper closed"
-
-    def release(self):
-        self.gripper = "open"
-        return "gripper open"
-
-    # -- <Perceive> ----------------------------------------------------------
-
-    def snapshot(self, topic_path_response=None):
-        return self._with_world(lambda world: world.get_pose(
-            self.robot_name, topic_path_response or self.world_response_topic))
-
-    # -- <Telemetry> ---------------------------------------------------------
-
-    def get_telemetry(self, topic_path_response=None):
-        telemetry = "(battery 87) (temperature 21.5)"
-        if topic_path_response:
+    def respond(self, topic_path_response, *fields):
+        """A query's reply: (item_count 1) then (response FIELDS) on the
+        caller's topic, if given; the text for the chat either way"""
+        fields = [str(field) for field in fields]
+        if topic_path_response and topic_path_response != "-":
             aiko.process.message.publish(topic_path_response, "(item_count 1)")
             aiko.process.message.publish(
-                topic_path_response, f"(response {telemetry})")
-        return telemetry
+                topic_path_response, generate("response", fields))
+        return " ".join(fields)
+
+    def publish_out(self, payload):
+        aiko.process.message.publish(f"{self.topic_path}/out", payload)
+
+    def set_telemetry_period(self, period):
+        if self.telemetry_timer:
+            aiko.event.remove_timer_handler(self.telemetry_timer)
+            self.telemetry_timer = None
+        if period and period > 0 and hasattr(self, "telemetry_tick"):
+            self.telemetry_timer = self.telemetry_tick
+            aiko.event.add_timer_handler(self.telemetry_tick, period)
+
+    def stop(self):
+        """Service.stop() terminates the whole process: never that over
+        the wire.  An interface with its own stop overrides this"""
+        return "stop is not one of this robot's commands"
+
+    def terminate(self, botname="all"):
+        """ChatBot.terminate() ends the process: fine for a robot run in
+        its own process, never for one hosted by the web server"""
+        if self.host == "external":
+            return super().terminate(botname)
+        return "terminate is not one of this robot's commands"
 
     # -- <Robot> -------------------------------------------------------------
 
     def get_interfaces(self, topic_path_response=None):
-        names = ["Chat", "Robot", *kind_interfaces(self.kind)]
+        names = ["Chat", "Robot", self.interface]
         if topic_path_response:
             aiko.process.message.publish(
                 topic_path_response, f"(item_count {len(names)})")
@@ -215,47 +241,69 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
         self.send_message(self.botname, [channel or self.current_channel],
                           f"{self.robot_name}: {text}{ACK_SUFFIX}")
 
+    def help_text(self):
+        module = self.module
+        examples = ", ".join(example for example, _ in registry.commands(
+            self.interface, self.kind))
+        return (f"a {self.kind} speaking {self.interface} ({module.STATUS}): "
+                f"{examples or 'no commands'}; also help, place X Y [H], "
+                f"join CHANNEL")
+
     def run_command(self, chat_command, username="anonymous"):
         """Returns the immediate reply, or None when the world will reply"""
-        method, arguments = parse_command(chat_command)
-        if method and not supports(self.kind, method):
+        self.current_username = username
+        method, arguments = self.module.parse_command(chat_command)
+        if method is None:
+            if self._generic_matches(chat_command):
+                return self._generic(chat_command)   # None: the world replies
+            return f"{arguments}; also: help, place X Y [H], join CHANNEL"
+        if not registry.supports(self.interface, self.kind, method):
             return (f"a {self.kind} cannot {method}: its commands are "
-                    f"{', '.join(kind_commands(self.kind))}")
-        match method:
-            case "move":
-                return self.move(arguments[0], username)
-            case "turn":
-                return self.turn(arguments[0], username)
-            case "stop":
-                return self.stop()
-            case "reset":
-                return self.reset(*arguments, username=username)
-            case "grasp":
-                return self.grasp()
-            case "release":
-                return self.release()
-            case "look":
-                return self.snapshot()
-            case "telemetry":
-                return f"telemetry: {self.get_telemetry()}"
-            case "interfaces":
-                return f"interfaces: {','.join(self.get_interfaces())}"
-            case "join":
-                self.change_channel(arguments[0])
-                return f"joined #{arguments[0]}"
-            case _:
-                return arguments            # the error text
+                    f"{', '.join(registry.method_names(self.interface, self.kind))}")
+        try:
+            result = getattr(self, method)(*arguments)
+        except (TypeError, ValueError) as error:
+            return f"{method}: {error}"
+        except NotImplementedError as error:
+            return str(error)
+        return result if isinstance(result, str) or result is None else str(result)
+
+    def _generic(self, chat_command):
+        """The sandbox's own words, the same for every interface"""
+        parts = chat_command.split()
+        match parts:
+            case ["help"] | ["interfaces"] | ["commands"]:
+                return self.help_text()
+            case ["join", channel]:
+                self.change_channel(channel)
+                return f"joined #{channel}"
+            case ["place" | "teleport" | "reset" | "home"]:
+                return self.body.place(0.0, 0.0, 0.0)
+            case ["place" | "teleport" | "reset" | "home", x, y]:
+                return self._place(x, y, 0.0)
+            case ["place" | "teleport" | "reset" | "home", x, y, heading]:
+                return self._place(x, y, heading)
+        return None
+
+    def _place(self, x, y, heading):
+        try:
+            return self.body.place(base.number(x, "x"), base.number(y, "y"),
+                                   base.number(heading, "heading"))
+        except ValueError as error:
+            return str(error)
 
     def command(self, chat_command, username="anonymous",
                 topic_path_response=None):
         """Any chat command, as a remote function call with the reply on
         topic_path_response: (response ok TEXT) or (response error TEXT).
-        The web server's POST /api/robots/NAME/command uses this for the
-        commands the world does not answer (grasp, release, telemetry, ...)"""
-        method, arguments = parse_command(chat_command)
+        The web server's POST /api/robots/NAME/command uses this"""
+        method, arguments = self.module.parse_command(chat_command)
+        if method is None and self._generic_matches(chat_command):
+            method = "generic"
         if method is None:
             status, reply = "error", arguments
-        elif not supports(self.kind, method):
+        elif method != "generic" and not registry.supports(
+                self.interface, self.kind, method):
             status, reply = "error", self.run_command(chat_command, username)
         else:
             status = "ok"
@@ -268,11 +316,16 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
                 topic_path_response, generate("response", [status, reply]))
         return reply
 
+    @staticmethod
+    def _generic_matches(chat_command):
+        return (chat_command.split() or [""])[0] in GENERIC
+
     # -- hosting -------------------------------------------------------------
 
     def detach(self):
         """Stop speaking for this robot (used by the web server when a
         robot it hosts is destroyed).  The Service leaves the Registrar"""
+        self.set_telemetry_period(0)
         if self.chat_server_topic:
             self.remove_message_handler(
                 self.server_message_handler, self.chat_server_topic)
@@ -288,40 +341,168 @@ class ChatRobotAgent(bot.ChatBot, Chat, Robot, Move, Grasp, Perceive, Telemetry)
         aiko.process.service_count = count
 
 
-def _pose_words(fields):
-    # fields: [command, name, x, y, heading, kind, z]
+class TwinMixin:
+    """The replica of a real robot: every interface function is forwarded
+    to the real Actor's "in" topic, and what the real one sends and
+    receives moves the twin by dead reckoning (the module's observe())"""
+
+    def twin_attach(self):
+        self.twin_state = {}
+        self.last_command_at = 0.0
+        self.real = get_service_proxy(f"{self.source}/in", self.module.Interface)
+        self.twin_response_topic = f"{self.topic_path}/twin_response"
+        self.add_message_handler(self._real_in_handler, f"{self.source}/in")
+        self.add_message_handler(self._real_out_handler, f"{self.source}/out")
+        self.add_message_handler(self._twin_response_handler, self.twin_response_topic)
+
+    def twin_detach(self):
+        self.remove_message_handler(self._real_in_handler, f"{self.source}/in")
+        self.remove_message_handler(self._real_out_handler, f"{self.source}/out")
+        self.remove_message_handler(self._twin_response_handler, self.twin_response_topic)
+
+    def _observe(self, direction, payload_in):
+        try:
+            command, arguments = parse(payload_in)
+        except Exception:
+            return
+        for op in registry.observe(self.interface, direction, command,
+                                   arguments, self.twin_state):
+            self.body.apply(op)
+
+    def _real_in_handler(self, _aiko, topic, payload_in):
+        self._observe("in", payload_in)
+
+    def _real_out_handler(self, _aiko, topic, payload_in):
+        self._observe("out", payload_in)
+        if time.time() - self.last_command_at < RELAY_SECONDS:
+            self._say(f"(out) {payload_in}")
+
+    def _twin_response_handler(self, _aiko, topic, payload_in):
+        try:
+            command, fields = parse(payload_in)
+        except Exception:
+            return
+        if command == "response":
+            self._say("(response) " + " ".join(str(field) for field in fields))
+
+    def forward_call(self, method, arguments, takes_response):
+        self.last_command_at = time.time()
+        arguments = [_wire(argument) for argument in arguments]
+        if takes_response:
+            arguments.append(self.twin_response_topic)
+        getattr(self.real, method)(*arguments)
+        return f"sent ({' '.join([method, *arguments])}) to {self.source}/in"
+
+
+def _forwarder(method, takes_response):
+    def forward(self, *arguments):
+        return self.forward_call(method, arguments, takes_response)
+    forward.__name__ = method
+    return forward
+
+
+_CLASSES = {}
+
+
+def actor_class(interface, twin=False):
+    """The Actor class for one interface: virtual (Simulated) or twin"""
+    key = (interface, twin)
+    if key not in _CLASSES:
+        module = registry.INTERFACES[interface]
+        if twin:
+            methods = {spec["name"]: _forwarder(
+                spec["name"], "topic_path_response" in spec["signature"])
+                for spec in base.method_specs(module.Interface)}
+            bases = (TwinMixin, ChatRobotBase, module.Interface)
+            name = f"Twin_{interface}"
+        else:
+            # Simulated first: Service.stop() would terminate the process
+            methods, bases, name = {}, (module.Simulated, ChatRobotBase,
+                                        module.Interface), f"Robot_{interface}"
+        methods["__module__"] = __name__
+        _CLASSES[key] = type(name, bases, methods)
+    return _CLASSES[key]
+
+
+def _wire(argument):
+    """Arguments as the wire takes them: a list becomes (a b c)"""
+    if isinstance(argument, (list, tuple)):
+        return "(" + " ".join(str(part) for part in argument) + ")"
+    return argument
+
+
+def _pose(fields):
+    # fields: [command, name, x, y, heading, kind, z, host, owner, interface, source, pen, moving]
     try:
-        words = (f"x={float(fields[2]):g} y={float(fields[3]):g} "
-                 f"heading={float(fields[4]):g}")
-        if len(fields) > 6 and float(fields[6]) != 0:
-            words += f" z={float(fields[6]):g}"
-        return words
+        pose = {"x": float(fields[2]), "y": float(fields[3]),
+                "heading": float(fields[4]),
+                "z": float(fields[6]) if len(fields) > 6 else 0.0}
     except (IndexError, ValueError):
+        return None
+    pose["moving"] = len(fields) > 12 and fields[12] == "moving"
+    return pose
+
+
+def _pose_words(fields):
+    pose = _pose(fields)
+    if not pose:
         return " ".join(str(field) for field in fields[1:])
+    words = f"x={pose['x']:g} y={pose['y']:g} heading={pose['heading']:g}"
+    if pose["z"]:
+        words += f" z={pose['z']:g}"
+    return words
 
 
-def robot_tags(robot_name, channel, kind, world_name=config.WORLD_NAME):
-    """Aspect tags per ADR-025: one per Interface this robot implements"""
-    interfaces = ["Chat", "Robot", *kind_interfaces(kind)]
-    return ["ec=true", "type=chat_robot", *aspect_tags(interfaces),
+def robot_tags(robot_name, channel, kind, interface, world_name=config.WORLD_NAME,
+               twin_of=None):
+    """Registrar tags: one aspect tag per Interface where the interface
+    has aspects (ADR-025), plus what the chat and the agent need.  Tag
+    values hold no spaces, one property per tag"""
+    tags = ["ec=true", f"{SANDBOX_TAG}={'twin' if twin_of else 'virtual'}",
+            "type=chat_robot", "chat=0", "robot=0", f"interface={interface}",
             f"botname=@@{robot_name}", f"channel={channel}", f"kind={kind}",
-            f"axes={kind_axes(kind)}", f"world={world_name}",
-            f"commands={','.join(kind_commands(kind))}"]
+            f"world={world_name}",
+            f"commands={','.join(registry.method_names(interface, kind))}"]
+    tags += registry.tags(interface, kind)
+    if twin_of:
+        tags.append(f"twin_of={twin_of}")
+    return tags
 
 
-def host_robot(robot_name, kind=DEFAULT_KIND, owner="anonymous",
+def host_robot(robot_name, kind=registry.DEFAULT_KIND, owner="anonymous",
                channel=config.CHANNEL, world_name=config.WORLD_NAME,
-               host="external"):
-    """Create the ChatRobotAgent Actor in this process and return it"""
+               host="external", interface=None):
+    """Create a virtual robot's Actor in this process and return it"""
+    kind, interface = registry.resolve(kind, interface)
+    module = registry.INTERFACES[interface]
     init_args = aiko.actor_args(
-        robot_name, protocol=ROBOT_PROTOCOL,
-        tags=robot_tags(robot_name, channel, kind, world_name))
+        robot_name, protocol=module.PROTOCOL or ROBOT_PROTOCOL,
+        tags=robot_tags(robot_name, channel, kind, interface, world_name))
     init_args.update({"robot_name": robot_name, "channel": channel,
                       "world_name": world_name, "kind": kind,
-                      "owner": owner, "host": host})
-    robot = aiko.compose_instance(ChatRobotAgent, init_args)
+                      "interface": interface, "owner": owner, "host": host})
+    robot = aiko.compose_instance(actor_class(interface), init_args)
     robot.attach_known_services()
     return robot
+
+
+def host_twin(robot_name, interface, source, kind=None, owner="anonymous",
+              channel=config.CHANNEL, world_name=config.WORLD_NAME):
+    """Create the twin of the real robot at topic path "source" """
+    kind = kind or registry.twin_kind(interface)
+    kind, interface = registry.resolve(kind, interface)
+    init_args = aiko.actor_args(
+        f"twin_{robot_name}", protocol=TWIN_PROTOCOL,
+        tags=robot_tags(robot_name, channel, kind, interface, world_name,
+                        twin_of=source))
+    init_args.update({"robot_name": robot_name, "channel": channel,
+                      "world_name": world_name, "kind": kind,
+                      "interface": interface, "owner": owner, "host": "twin",
+                      "source": source})
+    twin = aiko.compose_instance(actor_class(interface, twin=True), init_args)
+    twin.twin_attach()
+    twin.attach_known_services()
+    return twin
 
 
 @click.group()
@@ -333,21 +514,27 @@ def main():
 @main.command(name="run")
 @click.option("--name", "robot_name", type=str, required=True,
     help="robot name; also its chat mention @@NAME")
-@click.option("--kind", type=click.Choice(list(KINDS)),
-    default=DEFAULT_KIND, show_default=True)
+@click.option("--kind", type=click.Choice(list(registry.KINDS)),
+    default=registry.DEFAULT_KIND, show_default=True)
+@click.option("--interface", type=click.Choice(list(registry.INTERFACES)),
+    default=None, help="what it speaks (default: the kind's own)")
 @click.option("--owner", type=str, default=config.WEB_USERNAME,
     show_default=True)
 @click.option("--channel", type=str, default=config.CHANNEL, show_default=True)
 @click.option("--world", "world_name", type=str, default=config.WORLD_NAME,
     show_default=True)
-def run_command(robot_name, kind, owner, channel, world_name):
+def run_command(robot_name, kind, interface, owner, channel, world_name):
     from core import valid_robot_name
     if not valid_robot_name(robot_name):
         raise click.BadParameter(
             "letters, digits, '_' and '-' only (max 64)", param_hint="--name")
-    robot = host_robot(robot_name, kind, owner, channel, world_name)
-    robot.print(f"running as @@{robot_name} in #{channel}, "
-                f"topic_path={robot.topic_path}")
+    try:
+        robot = host_robot(robot_name, kind, owner, channel, world_name,
+                           interface=interface)
+    except ValueError as error:
+        raise click.BadParameter(str(error), param_hint="--interface")
+    robot.print(f"running as @@{robot_name} ({robot.kind}, {robot.interface}) "
+                f"in #{channel}, topic_path={robot.topic_path}")
     aiko.process.run()
 
 

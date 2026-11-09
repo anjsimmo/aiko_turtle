@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Turtle World: system</title>
+<html><head><meta charset="utf-8"><title>__TITLE__: system</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -39,7 +39,7 @@ a { color:var(--accent); }
 .hint { color:var(--muted); font-size:0.74rem; }
 </style></head><body>
 <header>
-  <h1>Turtle World <span class="sub">system</span></h1>
+  <h1>__TITLE__ <span class="sub">system</span></h1>
   <nav>
     <a href="/">home</a><a href="/world">world</a><a href="/chat">chat</a><a href="/guide">guide</a><a href="/system" class="here">system</a><a href="/docs">API</a><a href="https://github.com/anjsimmo/aiko_turtle" title="source code">github</a>
     <button id="lock" type="button" title="API token" aria-expanded="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> token</button>
@@ -77,7 +77,8 @@ a { color:var(--accent); }
 </section>
 <section class="panel">
   <h2>Registrar: who is running <span class="hint" id="cache"></span></h2>
-  <p>Every Service that has registered: the ProcessManager that keeps the 24x7 services up, the HyperSpace, the ChatServer, the world, each robot (one Service per robot, with its Interfaces as <code>move=0</code>-style tags), the LLM agent, and anyone who connects.</p>
+  <p>Every Service that has registered: the ProcessManager that keeps the 24x7 services up, the HyperSpace, the ChatServer, the world, each virtual robot (one Service per robot, tagged <code>sandbox=virtual</code>, <code>interface=…</code> and one <code>move=0</code>-style tag per Interface), the twins of real robots (<code>sandbox=twin</code>), the LLM agent, and anyone who connects. A row marked <em>real robot</em> is a physical robot's own Service, recognised by the name or protocol its interface module in <code>robots/</code> matches; the sandbox makes a twin of it on the map.</p>
+  <p id="realrobots"></p>
   <table id="services"><thead><tr><th>topic path</th><th>name</th><th>protocol</th><th>owner</th><th>tags</th></tr></thead><tbody></tbody></table>
 </section>
 </main>
@@ -185,9 +186,14 @@ function render() {
         if (watching) startWatch(svc.topic_path + "/#");
         document.getElementById("watchpanel").scrollIntoView({ behavior: "smooth" });
       });
-      tp.append(a); cell(tr, svc.name); cell(tr, svc.protocol); cell(tr, svc.owner); cell(tr, (svc.tags || []).join(" "), "tags");
+      tp.append(a); cell(tr, svc.name + (svc.real_robot ? "  [real robot: " + svc.real_robot + "]" : "")); cell(tr, svc.protocol); cell(tr, svc.owner); cell(tr, (svc.tags || []).join(" "), "tags");
+      if (svc.real_robot) tr.style.fontWeight = "500";
       st.append(tr);
     });
+    var real = s.real_robots || [];
+    document.getElementById("realrobots").textContent = real.length
+      ? "real robots on the broker now: " + real.map(function (r) { return r.name + " (" + r.interface + ", " + r.topic_path + ")"; }).join(";  ") + ". Each has a twin on the map; untick \"show real robots\" on the home page to hide them."
+      : "no real robot is on the broker right now (the sandbox watches for the names and protocols listed under /api/interfaces).";
   });
 }
 render(); setInterval(render, 5000);

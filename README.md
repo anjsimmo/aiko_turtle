@@ -1,12 +1,17 @@
-# aiko_turtle
+# aiko_turtle: the Aiko Sandbox
 
 Virtual robots in a shared world, for the AI+ML+Robots community to learn
-and play with [Aiko Services](https://github.com/geekscape/aiko_services).
-Anyone can create a robot, drive it from the chat, from a REST API, from
-an LLM agent or from their own Aiko code, and watch every robot move in
-the browser. A live instance is at **https://turtle.aiko.hashtag.ai**
+and play with [Aiko Services](https://github.com/geekscape/aiko_services),
+and a sandbox for the group's real robots. Anyone can create a robot that
+speaks a *real* robot's interface (the iRobot Create 3's, the XGO dog's,
+the LoliBot's, the June-2026 tutorial turtle's), drive it from the chat,
+from a REST API, from an LLM agent or from their own Aiko code, and watch
+every robot move in the browser. Real robots on the community broker
+appear as twins. A live instance is at **https://turtle.aiko.hashtag.ai**
 (the in-page [guide](https://turtle.aiko.hashtag.ai/guide) is the
-friendliest start).
+friendliest start). The page calls itself "Aiko Sandbox" (`TURTLE_TITLE`
+sets the name); the repository and the hostname keep the turtle name for
+now, see `docs/deployment.md` for the rename.
 
 ![The home page: the world map on the left, the #robots chat on the right](docs/screenshot.png)
 
@@ -18,9 +23,11 @@ ChatServer) run on the community instance **aiko.hashtag.ai**.
 
 **Who this is for.** Beginners who want to see a robot move in ten
 minutes, and developers who want to build agents and robots on a real
-distributed framework. The virtual robots use the same Interfaces a
-physical one would, so what you write here plugs into a real XGO, LoliBot
-or LeKiwi at the [meetup](https://www.meetup.com/ai-ml-robots/).
+distributed framework. A virtual robot accepts exactly the functions and
+units of the real robot whose interface it speaks, *as that robot's code
+is today*, so what you write here plugs into the real XGO, iRobot or
+LoliBot at the [meetup](https://www.meetup.com/ai-ml-robots/) with only
+the discovery filter changed.
 
 **How it was made.** Much of this code was written with an AI coding
 assistant, with a human deciding what to build, reviewing it and running
@@ -43,8 +50,9 @@ commits to compare against.
 | Process | What it is |
 |---|---|
 | `virtual_world.py` | **VirtualWorld** Actor: holds every robot's pose, persists them in a database, publishes them as the share `robots.<name>` |
-| `robot.py` | **ChatRobotAgent**: one Actor per robot, implementing `<Chat>` and `<Robot>` composed of the Interfaces its kind has (`<Move>` `<Grasp>` `<Perceive>` `<Telemetry>`, see `kinds.py`). Its body is in the world; it is the robot's voice in the chat and its entry in the Registrar |
-| `web.py` | **web server** (FastAPI): the pages (`/`, `/world`, `/chat`, `/guide`, `/system`), the REST API (`/docs`) and a live SSE stream. It also *hosts* a ChatRobotAgent for every robot created over REST, so those answer in the chat too |
+| `robots/` | **the robot interfaces**, one plug-in module each: what a robot accepts on its `in` topic, how its chat is parsed, how the real one is recognised in the Registrar, how a command moves its twin, and the virtual robot that speaks it. `irobot` and `xgo_robot` are real robots' interfaces as they are; `turtle_robot` is the June-2026 tutorial's; `proposed` and `lolibot` are ours |
+| `robot.py` | **the robot Actor**: one per robot, a `ChatBot` plus the interface's `Interface` and `Simulated` classes (`Robot_<interface>`), or a **twin** (`Twin_<interface>`) that forwards to a real robot and watches its topics. Its body is in the world; it is the robot's voice in the chat and its entry in the Registrar |
+| `web.py` | **web server** (FastAPI): the pages (`/`, `/world`, `/chat`, `/guide`, `/system`), the REST API (`/docs`) and a live stream. It *hosts* a robot Actor for every robot created over REST, and a twin for every real robot it sees in the Registrar |
 | `agent.py` | **LLM ChatAgent** `@@pilot`: discovers robots from Registrar tags and drives them in natural language. Rate limited |
 | `mcp_server.py` | **MCP server**: the robots as tools for Claude Code, Claude Desktop or any MCP client, over the REST API |
 
@@ -58,8 +66,16 @@ the Registrar:
   back; when it exits, the web server takes over again. So your own code
   (or a physical robot) can stand in for a virtual one at any time.
 
-Both are the same thing: a row in the world's database and a
-`<Chat>`+`<Robot>` Service in the Registrar.
+- **A real robot**: its own software registers with the Registrar, as
+  it does today. The web server recognises it (by the name or protocol
+  its `robots/` module matches) and creates a twin: a robot on the map,
+  named after the real robot, that estimates its pose from the commands
+  sent to it and the poses it reports, and forwards anything sent to the
+  twin on to the real robot.
+
+All three are the same thing: a row in the world's database and a
+`<Chat>` Service in the Registrar, tagged `sandbox=virtual` or
+`sandbox=twin` and `interface=<name>`.
 
 Identity is deliberately not validated: pick any user name and any robot
 name. If you do not want others driving your robot, pick a longer, more
@@ -185,36 +201,77 @@ pip install mcp
 claude mcp add turtle -e TURTLE_URL=https://turtle.aiko.hashtag.ai -- python3 $PWD/mcp_server.py
 ```
 
-## Robot kinds
+## Robots: interfaces and kinds
 
-| kind | what it is | Interfaces |
+Two things describe a robot. Its **kind** is the body: the sprite and
+how many axes `move` has. Its **interface** is what it speaks: the
+functions on its `in` topic, the chat words, the units, the protocol it
+registers with. Each kind lists the interfaces it may speak, the real
+robot's first; `GET /api/interfaces` and `GET /api/kinds` are the live
+versions of these tables.
+
+| interface | status | what it is | from |
+|---|---|---|---|
+| `irobot` | real | the Create 3 under aiko_irobot on Zebra2, registered as `robot`: `move` metres, `turn` degrees (+ = left), `drive`, `arc`, `goto`, `dock`, `led`, `beep`; queries `battery` `pose` `dock_status` `sensors` with a reply topic | `../zebra-robot/robot_client.py` |
+| `xgo_robot` | real | the XGO dog's Actor: `move x\|y STRIDE_MM` and `turn DEG/S` continuous until `stop`, `action NAME` from its table, `arm`, `claw` | the aiko_chat XGO example |
+| `turtle_robot` | legacy | the June-2026 tutorial turtle: `forward` `backward` `left` `right` `action` | `../old_tutorials` |
+| `lolibot` | proposed | `forward\|reverse\|left\|right [SECONDS]`, `stop`, `led R G B`, `speed %`: the updated firmware in `lolibot_mp/` | `../od_micro_py_files`, 2018 words kept |
+| `proposed` | proposed | the sandbox's `<Move>` `<Grasp>` `<Perceive>` `<Telemetry>`: `move` as a vector, `turn`, `stop`, `grasp`, `release`, `snapshot`, `get_telemetry` | `interfaces.py` |
+
+| kind | what it is | interfaces it may speak |
 |---|---|---|
-| `turtle` | the classic drawing turtle | Move Perceive Telemetry |
-| `lolibot` | the OHC [LoliBot](https://openhardwareconf.org/wiki/LoliBot), and Jon Oxer's BeetleBot | Move Perceive Telemetry |
-| `xgo` | XGO robot dog (walks forward and sideways) | Move Perceive Telemetry |
-| `lekiwi` | LeKiwi: LeRobot's omni base with an SO-101 arm (moves sideways too) | Move Grasp Perceive Telemetry |
-| `so101` | LeRobot SO-101 arm: grasps, does not drive | Grasp Perceive Telemetry |
-| `drone` | a generic quadcopter: `move` is a 3D vector, forward, left, up | Move Perceive Telemetry |
-| `pi` | a Raspberry Pi with display, speaker and mic: senses, does not move | Perceive Telemetry |
+| `turtle` | the classic drawing turtle | proposed, turtle_robot |
+| `lolibot` | the OHC [LoliBot](https://openhardwareconf.org/wiki/LoliBot), and Jon Oxer's BeetleBot | lolibot, proposed |
+| `xgo` | XGO robot dog (walks forward and sideways) | xgo_robot, proposed |
+| `irobot` | iRobot Create 3 with a Pi on top | irobot, proposed |
+| `lekiwi` | LeKiwi: LeRobot's omni base with an SO-101 arm | proposed |
+| `so101` | LeRobot SO-101 arm: grasps, does not drive | proposed |
+| `drone` | a generic quadcopter: `move` is forward, left, up | proposed |
+| `pi` | a Raspberry Pi with display, speaker and mic: senses, does not move | proposed |
 
-A kind decides the sprite on the map, the chat commands a robot accepts
-(`@@pi move 10` gets "a pi cannot move", `@@turtle move 0 50` gets "a
-turtle cannot move left"), how many axes `move` takes, and the aspect
-tags it registers with. `reset X Y [H]` puts any kind anywhere (plain
-`reset` is the origin), and so does dragging it on the map. Register a robot of a kind and `aiko_registrar list` shows exactly
-what it can do.
+Real interfaces are described **as the robot's code is today**, not as a
+future design might wish; the dangerous functions (`power_off`, `e_stop`,
+`terminate`) are refused in the chat. The world is in centimetres, so an
+iRobot's `move 1` is 100 units and an XGO's 100 mm stride is 10. Every
+robot also takes the sandbox's own words, `help`, `place X Y [H]`, `join
+CHANNEL`, and can be dragged on the map.
 
-**Adding a kind** (a pull request is very welcome, or fork and build your
-own world on top of this one):
+**The three layers.** The page's *send as* switch sends the same command
+as a chat message, as the Aiko remote function call the chat makes
+(`(move x 100)` on the Actor's `in` topic, with the Python that does the
+same through a ServiceFilter), or as the raw MQTT message; the *on the
+wire* log shows the selected robot's topics live. `GET
+/api/robots/NAME/wire?command=...` is the translation.
 
-1. One entry in `kinds.py`: label, description, the Interfaces it has.
-2. One drawing function in `static/index.html`, next to `drawTurtle`:
-   top-down, nose along +x, about 40 px across, in the robot's colour
-   `col`. Add it to the `SPRITES` table.
-3. If it needs a new Interface, add the Interface to `interfaces.py`
-   (abstract methods plus a `*Default` placeholder), the command to
-   `core.parse_command` and `kinds.COMMAND_INTERFACES`, and the
-   implementation to `ChatRobotAgent`. Run `pytest`.
+**Twins.** When a Service a module recognises appears in the Registrar,
+the web server creates a twin named after it (`name_host` on a clash),
+drawn with a dashed ring, dimmed when the robot goes away, hidden by the
+*show real robots* toggle. Its pose is an estimate: you place it to line
+it up with the room; the module's `observe()` dead reckons from every
+command on the real robot's `in` topic (an iRobot `move 1` is 100 units,
+an XGO `move x 100` walks at two strides a second until `stop`); a pose
+the robot reports on `out` wins. Chat or the aiko/mqtt layers sent to the
+twin go to the real robot, and its replies are relayed into the chat for
+a few seconds. Swapping a simulated robot for the real one is then only a
+change of discovery filter: the guide's section 7 walks through it.
+
+**Adding a robot** is one module and, for a new body, one sprite; nothing
+else is edited, the registry lists the package:
+
+1. Copy `robots/_template.py` to `robots/NAME.py` and fill in the
+   contract at the top of `robots/__init__.py`: `Interface` (abstract
+   methods with docstrings, the spec people read), `Simulated` (the
+   virtual robot, acting on `self.body`), `parse_command`, `COMMANDS`,
+   `MATCH` (how the real one is recognised), `observe` (dead reckoning
+   for the twin), `KINDS`/`FITS`.
+2. `static/sprites/NAME.js`: `SPRITES.NAME = function (c, col) {...}`,
+   top-down, nose along +x, about 40 px across.
+3. `python3 -m pytest -q tests`: the registry test checks every module.
+
+`tools/infer_interface.py NAME --code PATH | --watch TOPIC | --registrar
+NAME | --notes TEXT [--write]` drafts the module with the LLM from a
+robot's code or its traffic on the bus, for you to review; the Claude
+Code skill `.claude/skills/add-robot` is the same recipe.
 
 ## Tests
 
@@ -256,13 +313,16 @@ the proxy needs `proxy_buffering off` for the SSE endpoint.
 | `db.py` | the `robots` and `events` tables (SQLAlchemy Core) |
 | `world_model.py` | the world without Aiko: poses, maths, persistence |
 | `virtual_world.py` | the VirtualWorld Actor |
-| `interfaces.py` | `<Chat>` `<Robot>` `<Move>` `<Grasp>` `<Perceive>` `<Telemetry>` and the aspect tags |
-| `kinds.py` | the robot kinds: Interfaces and commands of each |
-| `core.py` | chat command parser, LLM output parser, rate limiter, name rule |
-| `robot.py` | ChatRobotAgent (`./robot.py run`, and `host_robot()` for the web server) |
+| `interfaces.py` | the proposed `<Chat>` `<Robot>` `<Move>` `<Grasp>` `<Perceive>` `<Telemetry>` |
+| `robots/` | the registry (`__init__.py`, with the module contract), `base.py` (Body, statuses, units), one module per interface, `_template.py` |
+| `kinds.py` | a thin facade over the registry for the web app and the agent |
+| `core.py` | LLM output parser, rate limiter, name rule |
+| `robot.py` | the robot Actors: `Robot_<interface>` and `Twin_<interface>` (`./robot.py run`, `host_robot()`, `host_twin()`) |
+| `lolibot_mp/` | the updated LoliBot MicroPython firmware for the `lolibot` interface (not yet flashed) |
+| `tools/infer_interface.py` | drafts a `robots/` module from code, traffic or notes |
 | `agent.py` | the LLM ChatAgent |
 | `webapp.py` | the FastAPI app and routes (no Aiko; testable) |
-| `static/` | the pages: `index.html` (also `/world`, `/chat`), `guide.html`, `system.html` |
+| `static/` | the pages: `index.html` (also `/world`, `/chat`), `guide.html`, `system.html`; `sprites/` one drawing per kind |
 | `mcp_server.py` | MCP server over the REST API |
 | `examples/` | `rest_drive.py`, `aiko_drive.py`, `agent_bot.py`, `colab_turtle.ipynb` |
 | `web.py` | the Aiko-connected backend and server |
@@ -273,14 +333,33 @@ the proxy needs `proxy_buffering off` for the SSE endpoint.
 
 ## Design notes
 
-- **Aspect tags.** A robot registers with one tag per Interface it
-  implements, `chat=0 robot=0 move=0 perceive=0 telemetry=0` (the
-  framework's one-aspect-per-tag convention, as in ADR-025 and the
-  display protocol), plus `botname=`, `channel=`, `kind=`, `commands=`.
+- **Real interfaces as they are.** The constitution in aiko_services
+  (ADR-023 deny-by-default gates, ADR-025 aspect tags, ADR-028 one
+  property per tag) is the direction, and the sandbox follows it where it
+  can: plain `move=0` tags, no spaces in tag values, reply-to topics with
+  `(item_count N)` then `(response ...)`, discovery by ServiceFilter not
+  literal topics. But the robots we have speak what their code speaks
+  now, so each `robots/` module describes an interface verbatim, with its
+  units and quirks, and a virtual robot registers with the real robot's
+  protocol so one filter finds both. For older robots, simpler is better.
+- **Aspect tags.** A virtual robot registers with one tag per Interface
+  where the interface has aspects, `chat=0 robot=0 move=0 perceive=0
+  telemetry=0`, plus `sandbox=virtual|twin`, `interface=`, `botname=`,
+  `channel=`, `kind=`, `commands=`, and `twin_of=<topic path>` on a twin.
   The agent discovers robots with `implements(tags, "Robot")`; a
-  ServiceFilter can select on `tags=["move=0"]`. Versioning comes free:
-  a `move=1` robot simply does not match a `move=0` client. A kind
-  without `<Move>` simply has no `move=0` tag.
+  ServiceFilter can select on `tags=["move=0"]`, on `interface=xgo_robot`
+  or on the protocol. A kind without `<Move>` simply has no `move=0` tag.
+- **Twins estimate, they do not measure.** A twin's pose is dead
+  reckoning from the real robot's `in` topic (the module's `observe()`),
+  overridden by any pose the robot reports on `out` for ten seconds. The
+  page says "twin" next to it so no one reads it as ground truth. The
+  iRobot's Registrar protocol string was not observable (no robot was
+  online), so that module matches by the Actor name `robot`; fix `MATCH`
+  once seen.
+- **The world integrates continuous motion.** Real interfaces drive at a
+  velocity until `stop` (the XGO, the iRobot's `drive`, the LoliBot), so
+  the world has `drive`/`stop` and a 10 Hz tick next to the instant
+  `move`/`turn`, and a `pen` for the legacy turtle.
 - **The Interfaces** follow the 2026-08-15 study-group design: `<Robot>`
   composed of `<Move>` (move, turn, stop), `<Telemetry>`, `<Perceive>`,
   and `<Grasp>` for the arms. As in that design, `move` takes a vector
@@ -313,7 +392,8 @@ the proxy needs `proxy_buffering off` for the SSE endpoint.
 Everything is welcome: a new robot kind, a better sprite, a tutorial, a
 bug report, a question. Good first contributions:
 
-- a kind for a robot you own (see "Adding a kind" above);
+- a `robots/` module for a robot you own (see "Adding a robot" above);
+- flashing `lolibot_mp/` to a LoliBot and reporting what broke;
 - running `examples/colab_turtle.ipynb` in Colab and reporting what broke;
 - an example in another language against the REST API;
 - `<Navigation>` or a 3D `<Move>` for the drone.
@@ -339,3 +419,8 @@ robots are.
 - The agent sends robot commands one second apart; order is kept because
   the world applies each instantly.
 - No identity: anyone can drive any robot, by design for now.
+- The real robots' interfaces were taken from their code, not from a live
+  robot: no XGO, iRobot or LoliBot was on the broker while this was
+  written. The iRobot's protocol string is unknown (matched by name);
+  `lolibot_mp/` has not been flashed; a twin's dead reckoning speeds
+  (XGO strides per second, LoliBot cm/s) are guesses to calibrate.

@@ -29,6 +29,9 @@ WORLD_NAME = env("TURTLE_WORLD", "turtle_world")
 # HyperSpace and ChatServer storage.  Any SQLAlchemy URL works
 DATABASE_URL = env("TURTLE_DATABASE_URL", "sqlite:///turtle.db")
 
+# The page's name (the subdomain used to be turtle.; sandbox. is the plan)
+TITLE = env("TURTLE_TITLE", "Aiko Sandbox")
+
 # Chat
 CHANNEL = env("TURTLE_CHANNEL", "robots")
 AGENT_BOTNAME = env("TURTLE_AGENT", "@@pilot")
