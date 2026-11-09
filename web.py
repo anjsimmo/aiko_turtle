@@ -428,6 +428,8 @@ class AikoBackend(aiko.Actor):
             return self.mqtt_watch_client
         import paho.mqtt.client as mqtt
         message = aiko.process.message
+        if not hasattr(message, "mqtt_transport"):   # Aiko is still connecting
+            raise BackendError(503, "not connected to the broker yet, retry in a moment")
         client = mqtt.Client(transport=message.mqtt_transport)
         if message.mqtt_tls_enabled:
             client.tls_set()

@@ -129,20 +129,21 @@ form.send .grow { flex:1; min-width:0; }
 a { color:var(--accent); }
 </style></head><body class="view-__VIEW__">
 <header>
-  <h1>__TITLE__<span class="tag">virtual robots, real interfaces</span></h1>
+  <h1>__TITLE__<span class="tag" id="tagline">virtual robots, real interfaces</span></h1>
   <nav>
     <a href="/" id="nav-home">home</a><a href="/world" id="nav-world">world</a><a href="/chat" id="nav-chat">chat</a><a href="/guide">guide</a><a href="/system">system</a><a href="/docs">API</a><a href="https://github.com/anjsimmo/aiko_turtle" title="source code">github</a>
     <button id="lock" type="button" title="API token" aria-expanded="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> token</button>
   </nav>
 </header>
 <div id="tokenbar"><label for="token">API token</label><input id="token" type="text" spellcheck="false" placeholder="paste the token"><span id="tokennote">sent with every create, drive and chat; the same <code>Authorization: Bearer …</code> header works for curl and scripts</span></div>
-<div id="status"><span id="conn">connecting…</span><span id="connhelp" class="warn"></span><span>New here? Read the <a href="/guide">guide</a>.</span></div>
+<div id="status"><span id="conn">connecting…</span><span id="connhelp" class="warn"></span></div>
 <main id="grid">
 <section class="panel" id="worldpanel">
   <h2>World <span id="world"></span><a href="/world">full map</a></h2>
   <div id="mapbar">
     <span id="zoom"><button type="button" id="zin" title="zoom in (or scroll on the map)">+</button><button type="button" id="zout" title="zoom out">&minus;</button><button type="button" id="zfit" title="show every robot">fit all</button></span>
-    <label title="a replica is the replica of a real robot on the broker"><input type="checkbox" id="showreplicas" checked> show real robots (replicas)</label><span id="replicacount"></span>
+    <label title="a virtual robot lives only here"><input type="checkbox" id="showvirtual" checked> show virtual robots</label>
+    <label title="a replica stands in for a real robot that is on the broker; its position is an estimate"><input type="checkbox" id="showreplicas" checked> show replicas (twins) of real robots</label><span id="replicacount"></span>
   </div>
   <canvas id="c" width="600" height="600"></canvas>
   <div class="hintline">scroll to zoom · drag the ground to pan · drag a robot to put it somewhere else · dashed ring: a replica of a real robot</div>
@@ -208,6 +209,12 @@ a { color:var(--accent); }
 var AGENT = "__AGENT__", DEFAULT_CHANNEL = "__CHANNEL__", AUTH = __AUTH__, S = 600;
 var VIEW = "__VIEW__";
 document.getElementById(VIEW === "world" ? "nav-world" : VIEW === "chat" ? "nav-chat" : "nav-home").className = "here";
+(function () {                           // the tagline: the page's name, or the pitch on the home page
+  var tag = document.getElementById("tagline");
+  if (VIEW === "world" || VIEW === "chat") { tag.textContent = VIEW; return; }
+  tag.textContent = "virtual robots, real interfaces (new here? read the ";
+  var a = document.createElement("a"); a.href = "/guide"; a.textContent = "guide"; tag.append(a, ")");
+})();
 
 // ---- identity: humans are @name, bots @@name ------------------------------
 function store(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
@@ -299,11 +306,16 @@ if (!ctx.roundRect) {
   };
 }
 var robots = {}, selected = null;
-var showReplicas = document.getElementById("showreplicas");
+var showReplicas = document.getElementById("showreplicas"), showVirtual = document.getElementById("showvirtual");
 showReplicas.checked = load("turtle.replicas", "yes") !== "no";
-showReplicas.addEventListener("change", function () { store("turtle.replicas", showReplicas.checked ? "yes" : "no"); if (!visible(selected)) selected = null; renderRobots(); draw(); });
+showVirtual.checked = load("turtle.virtual", "yes") !== "no";
+function onToggle() {
+  store("turtle.replicas", showReplicas.checked ? "yes" : "no"); store("turtle.virtual", showVirtual.checked ? "yes" : "no");
+  if (!visible(selected)) selected = null; renderRobots(); draw();
+}
+showReplicas.addEventListener("change", onToggle); showVirtual.addEventListener("change", onToggle);
 function isReplica(r) { return r && r.host === "replica"; }
-function visible(name) { var r = robots[name]; return !!r && (showReplicas.checked || !isReplica(r)); }
+function visible(name) { var r = robots[name]; return !!r && (isReplica(r) ? showReplicas.checked : showVirtual.checked); }
 function shown() { return Object.keys(robots).filter(visible); }
 var PALETTE = ["#0b7a4b","#2456a6","#b5651d","#7b3fa0","#b23a3a","#1f8a8a","#8a7a1f","#c2185b"];
 function colorOf(name) {
@@ -733,7 +745,9 @@ function watchWire() {
     if (++wireLines > 200) { wirelog.firstChild.remove(); }
     wirelog.scrollTop = wirelog.scrollHeight;
   };
-  wireSource.onerror = function () { if (wireSource && wireSource.readyState === EventSource.CLOSED) wirelog.textContent += "\n(stream closed)"; };
+  wireSource.onerror = function () {            // a 503 while the server is still connecting: try again shortly
+    if (wireSource && wireSource.readyState === EventSource.CLOSED) { wirelog.textContent += "\n(stream closed, retrying)"; wireSource = null; setTimeout(watchWire, 3000); }
+  };
 }
 
 function setStatus(s) {
